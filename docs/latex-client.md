@@ -51,6 +51,14 @@ For a phone-only ARM64 build:
 npm run android:latex -- --arch arm64-v8a
 ```
 
+If Hermes exhausts local memory, add `--low-memory`. This serializes Gradle
+workers and uses Hermes `-Og` instead of `-O`; it still builds a signed release
+APK, with fewer compiler optimizations:
+
+```powershell
+npm run android:latex -- --arch arm64-v8a --low-memory
+```
+
 The result is `artifacts/paseo-latex-<upstream-version>-r<revision>.apk`, signed
 with the personal key. `--prepare-only` regenerates the Android project and
 signing configuration without compiling or installing an APK.

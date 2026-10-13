@@ -10,6 +10,7 @@ const { values } = parseArgs({
     "prepare-only": { type: "boolean", default: false },
     revision: { type: "string", default: "1" },
     arch: { type: "string" },
+    "low-memory": { type: "boolean", default: false },
   },
 });
 if (!/^[1-9]\d?$/.test(values.revision)) throw new Error("--revision must be 1 through 99");
@@ -36,7 +37,7 @@ function run({ command, args, cwd }) {
     env,
     stdio: "inherit",
     windowsHide: true,
-    shell: process.platform === "win32",
+    shell: process.platform === "win32" && ["npm", "npx"].includes(command),
   });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
@@ -45,6 +46,17 @@ function run({ command, args, cwd }) {
 run({
   command: "npm",
   args: ["run", "build:math-assets", "--workspace=@getpaseo/app"],
+  cwd: repoRoot,
+});
+run({
+  command: "npm",
+  args: [
+    "run",
+    "format:files",
+    "--",
+    "packages/app/src/components/markdown/math/assets.gen.ts",
+    "packages/app/src/components/markdown/math/katex.gen.css",
+  ],
   cwd: repoRoot,
 });
 run({
@@ -61,12 +73,31 @@ if (values["prepare-only"]) {
   const gradleArgs = [
     ":app:assembleRelease",
     "--no-daemon",
-    "--max-workers=2",
+    values["low-memory"] ? "--max-workers=1" : "--max-workers=2",
     "-Dorg.gradle.parallel=false",
   ];
   if (values.arch) gradleArgs.push(`-PreactNativeArchitectures=${values.arch}`);
-  const gradle = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
-  run({ command: gradle, args: gradleArgs, cwd: androidRoot });
+  if (values["low-memory"]) {
+    gradleArgs.push(
+      "-PpaseoLatexLowMemoryBuild=true",
+      "-Pkotlin.compiler.execution.strategy=in-process",
+    );
+  }
+  if (process.platform === "win32") {
+    const java = process.env.JAVA_HOME ? path.join(process.env.JAVA_HOME, "bin/java.exe") : "java";
+    run({
+      command: java,
+      args: [
+        "-classpath",
+        path.join(androidRoot, "gradle/wrapper/gradle-wrapper.jar"),
+        "org.gradle.wrapper.GradleWrapperMain",
+        ...gradleArgs,
+      ],
+      cwd: androidRoot,
+    });
+  } else {
+    run({ command: "./gradlew", args: gradleArgs, cwd: androidRoot });
+  }
   const version = JSON.parse(fs.readFileSync(path.join(appRoot, "package.json"), "utf8")).version;
   const artifact = path.join(
     repoRoot,
