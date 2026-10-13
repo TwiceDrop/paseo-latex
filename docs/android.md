@@ -8,10 +8,14 @@ Controlled by `APP_VARIANT` in `packages/app/app.config.js` (vanilla Expo, no cu
 | ------------- | ----------- | ---------------- |
 | `production`  | Paseo       | `sh.paseo`       |
 | `development` | Paseo Debug | `sh.paseo.debug` |
+| `latex`       | Paseo LaTeX | `sh.paseo.latex` |
 
 EAS profiles: `development`, `production`, and `production-apk` in `packages/app/eas.json`.
 
 `development` uses Android `debug`.
+
+The personal `latex` variant uses local release signing and the maintenance
+workflow in [latex-client.md](latex-client.md).
 
 ## Version codes
 

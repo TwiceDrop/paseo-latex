@@ -1,0 +1,82 @@
+import fs from "node:fs";
+import path from "node:path";
+import { parseArgs } from "node:util";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { loadSigningEnvironment } from "./signing.mjs";
+
+const { values } = parseArgs({
+  options: {
+    "prepare-only": { type: "boolean", default: false },
+    revision: { type: "string", default: "1" },
+    arch: { type: "string" },
+  },
+});
+if (!/^[1-9]\d?$/.test(values.revision)) throw new Error("--revision must be 1 through 99");
+const supportedArchitectures = ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"];
+if (values.arch && !supportedArchitectures.includes(values.arch))
+  throw new Error("Unsupported Android architecture");
+const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
+const appRoot = path.join(repoRoot, "packages/app");
+const androidRoot = path.join(appRoot, "android");
+if (!path.resolve(androidRoot).startsWith(path.resolve(repoRoot) + path.sep)) {
+  throw new Error("The Android prebuild target must stay inside this checkout");
+}
+const env = {
+  ...process.env,
+  ...loadSigningEnvironment(),
+  APP_VARIANT: "latex",
+  PASEO_LATEX_REVISION: values.revision,
+  CI: "1",
+};
+
+function run({ command, args, cwd }) {
+  const result = spawnSync(command, args, {
+    cwd,
+    env,
+    stdio: "inherit",
+    windowsHide: true,
+    shell: process.platform === "win32",
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+run({
+  command: "npm",
+  args: ["run", "build:math-assets", "--workspace=@getpaseo/app"],
+  cwd: repoRoot,
+});
+run({
+  command: "npx",
+  args: ["--no-install", "expo", "prebuild", "--platform", "android", "--no-install", "--clean"],
+  cwd: appRoot,
+});
+if (values["prepare-only"]) {
+  process.stdout.write(
+    "Prepared Paseo LaTeX (sh.paseo.latex) with personal release signing. No APK was built.\n",
+  );
+} else {
+  run({ command: "npm", args: ["run", "build:app-deps"], cwd: repoRoot });
+  const gradleArgs = [
+    ":app:assembleRelease",
+    "--no-daemon",
+    "--max-workers=2",
+    "-Dorg.gradle.parallel=false",
+  ];
+  if (values.arch) gradleArgs.push(`-PreactNativeArchitectures=${values.arch}`);
+  const gradle = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
+  run({ command: gradle, args: gradleArgs, cwd: androidRoot });
+  const version = JSON.parse(fs.readFileSync(path.join(appRoot, "package.json"), "utf8")).version;
+  const artifact = path.join(
+    repoRoot,
+    "artifacts",
+    `paseo-latex-${version}-r${values.revision}.apk`,
+  );
+  fs.mkdirSync(path.dirname(artifact), { recursive: true });
+  fs.copyFileSync(
+    path.join(androidRoot, "app/build/outputs/apk/release/app-release.apk"),
+    artifact,
+  );
+  process.stdout.write(`Signed APK: ${artifact}\n`);
+}

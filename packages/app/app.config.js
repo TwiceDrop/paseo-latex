@@ -4,6 +4,7 @@ const pkg = require("./package.json");
 const withAndroidAsyncStorageSize = require("./plugins/with-android-async-storage-size");
 const withAndroidOptionalCamera = require("./plugins/with-android-optional-camera");
 const withAndroidProfileable = require("./plugins/with-android-profileable");
+const withAndroidLatexSigning = require("./plugins/with-android-latex-signing");
 const withFdroidAutolinking = require("./plugins/with-fdroid-autolinking");
 const withPasteInput = require("./plugins/with-paste-input");
 const withAndroidScroll = require("./modules/paseo-scroll/app.plugin");
@@ -11,6 +12,7 @@ const { getNativeReleaseVersion } = require("./native-release-version");
 const appVariant = process.env.APP_VARIANT ?? "production";
 const isFdroidBuild = process.env.PASEO_FDROID_BUILD === "1";
 const isProfileBuild = process.env.PASEO_PROFILE_BUILD === "1";
+const isLatexBuild = appVariant === "latex";
 
 const buildProfile = isFdroidBuild
   ? {
@@ -67,6 +69,15 @@ function resolveSecretFile(params) {
 }
 
 const variants = {
+  latex: {
+    name: "Paseo LaTeX",
+    packageId: "sh.paseo.latex",
+    googleServicesFile: resolveSecretFile({
+      envKey: "GOOGLE_SERVICES_FILE_LATEX",
+      fallbackRelativePath: "./.secrets/google-services.latex.json",
+    }),
+    googleServiceInfoPlist: undefined,
+  },
   production: {
     name: "Paseo",
     packageId: "sh.paseo",
@@ -95,11 +106,33 @@ const variants = {
 
 const variant = variants[appVariant] ?? variants.production;
 const nativeReleaseVersion = getNativeReleaseVersion(pkg.version);
+let androidVersionCode = nativeReleaseVersion.androidVersionCode;
+let expoAccount = { owner: "getpaseo" };
+let easConfig = { eas: { projectId: "0e7f65ce-0367-46c8-a238-2b65963d235a" } };
+if (isLatexBuild) {
+  const revision = Number(process.env.PASEO_LATEX_REVISION ?? "1");
+  if (!Number.isInteger(revision) || revision < 1 || revision > 99) {
+    throw new Error("PASEO_LATEX_REVISION must be an integer from 1 through 99");
+  }
+  androidVersionCode = androidVersionCode * 100 + revision;
+  if (androidVersionCode > 2_100_000_000) {
+    throw new Error("The LaTeX version code exceeds Android's supported range");
+  }
+  expoAccount = {};
+  easConfig = {};
+  const personalProjectId = process.env.PASEO_LATEX_EAS_PROJECT_ID;
+  if (personalProjectId) {
+    if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(personalProjectId)) {
+      throw new Error("PASEO_LATEX_EAS_PROJECT_ID must be your Expo project's UUID");
+    }
+    easConfig = { eas: { projectId: personalProjectId } };
+  }
+}
 
 export default {
   expo: {
     name: variant.name,
-    slug: "voice-mobile",
+    slug: isLatexBuild ? "paseo-latex" : "voice-mobile",
     version: nativeReleaseVersion.appVersion,
     orientation: "portrait",
     icon: "./assets/images/icon.png",
@@ -130,7 +163,7 @@ export default {
       usesCleartextTraffic: true,
       permissions: buildProfile.androidPermissions,
       package: variant.packageId,
-      versionCode: nativeReleaseVersion.androidVersionCode,
+      versionCode: androidVersionCode,
       ...(variant.googleServicesFile ? { googleServicesFile: variant.googleServicesFile } : {}),
     },
     web: {
@@ -181,6 +214,7 @@ export default {
       ],
       ...buildProfile.fdroidPlugins,
       ...(isProfileBuild ? [withAndroidProfileable] : []),
+      ...(isLatexBuild ? [withAndroidLatexSigning] : []),
     ],
     experiments: {
       typedRoutes: true,
@@ -191,10 +225,8 @@ export default {
       fdroidBuild: isFdroidBuild,
       profileBuild: isProfileBuild,
       router: {},
-      eas: {
-        projectId: "0e7f65ce-0367-46c8-a238-2b65963d235a",
-      },
+      ...easConfig,
     },
-    owner: "getpaseo",
+    ...expoAccount,
   },
 };
