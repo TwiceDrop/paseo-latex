@@ -197,6 +197,15 @@ Beta releases are an explicit no-op: they do not create or rewrite F-Droid chang
 
 Keep `react` and `react-dom` pinned to the React version embedded by the current `react-native` release. React Native `0.81.x` embeds `react-native-renderer` `19.1.0`, so `packages/app` must use React `19.1.0`. Bumping React to a newer patch can build successfully but crash at JS startup on Android with `Incompatible React versions`, leaving the app on the native splash screen.
 
+### Startup globals
+
+Initialize `navigator` through the side-effect import in `packages/app/index.ts`
+before Expo Router imports the route tree. A call inside `_layout.tsx` runs too
+late: native terminal components import `@xterm/headless`, which reads
+`navigator.userAgent` and `navigator.platform` while evaluating its module.
+React Native supplies an incomplete navigator, causing a release startup crash
+before any screen is displayed.
+
 ## Screenshots
 
 ```bash

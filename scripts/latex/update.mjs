@@ -58,6 +58,7 @@ if (!values["dry-run"]) {
   run({ command: "npm", args: ["run", "lint"] });
   const tests = [
     "app.config.test.ts",
+    "src/polyfills/initialize-navigator.test.ts",
     "src/utils/assistant-markdown-parser.test.ts",
     "src/utils/__tests__/split-markdown-blocks.test.ts",
     "src/components/markdown/html-ish.test.ts",

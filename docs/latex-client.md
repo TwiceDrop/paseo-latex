@@ -51,6 +51,12 @@ For a phone-only ARM64 build:
 npm run android:latex -- --arch arm64-v8a
 ```
 
+To test the same APK on an ARM64 phone and an x86_64 emulator, include both ABIs:
+
+```powershell
+npm run android:latex -- --arch arm64-v8a,x86_64
+```
+
 If Hermes exhausts local memory, add `--low-memory`. This serializes Gradle
 workers and uses Hermes `-Og` instead of `-O`; it still builds a signed release
 APK, with fewer compiler optimizations:

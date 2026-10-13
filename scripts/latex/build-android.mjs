@@ -14,8 +14,13 @@ const { values } = parseArgs({
   },
 });
 if (!/^[1-9]\d?$/.test(values.revision)) throw new Error("--revision must be 1 through 99");
-const supportedArchitectures = ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"];
-if (values.arch && !supportedArchitectures.includes(values.arch))
+const supportedArchitectures = new Set(["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]);
+const requestedArchitectures = values.arch?.split(",");
+if (
+  requestedArchitectures &&
+  (requestedArchitectures.some((arch) => !supportedArchitectures.has(arch)) ||
+    new Set(requestedArchitectures).size !== requestedArchitectures.length)
+)
   throw new Error("Unsupported Android architecture");
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const appRoot = path.join(repoRoot, "packages/app");

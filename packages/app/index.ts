@@ -1,4 +1,8 @@
-// Polyfill crypto.randomUUID for React Native before any other imports
+// Initialize browser-shaped globals before route imports evaluate native xterm.
+// oxlint-disable-next-line import/no-unassigned-import -- Startup must precede dependency evaluation.
+import "./src/polyfills/initialize-navigator";
+
+// Polyfill crypto.randomUUID for React Native.
 import { polyfillCrypto } from "./src/polyfills/crypto";
 polyfillCrypto();
 
