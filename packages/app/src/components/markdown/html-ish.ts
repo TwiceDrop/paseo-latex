@@ -1,4 +1,5 @@
 import { Parser } from "htmlparser2";
+import { findMathSpan } from "./math/parser";
 
 export interface MarkdownTextPart {
   kind: "markdown";
@@ -720,7 +721,20 @@ function getProtectedMarkdownRanges(source: string): ProtectedMarkdownRange[] {
     ...fencedRanges,
     ...getInlineCodeRanges(source, fencedRanges),
   ]);
-  return mergeProtectedRanges([...codeRanges, ...getLiteralAngleBracketRanges(source, codeRanges)]);
+  const mathRanges: ProtectedMarkdownRange[] = [];
+  for (let index = 0; index < source.length; index++) {
+    if (isProtectedIndex(index, codeRanges)) continue;
+    if (source[index] !== "$" && source[index] !== "\\") continue;
+    const span = findMathSpan(source, index, true);
+    if (!span) continue;
+    mathRanges.push({ start: index, end: span.end });
+    index = span.end - 1;
+  }
+  const literalRanges = mergeProtectedRanges([...codeRanges, ...mathRanges]);
+  return mergeProtectedRanges([
+    ...literalRanges,
+    ...getLiteralAngleBracketRanges(source, literalRanges),
+  ]);
 }
 
 /**

@@ -1,7 +1,9 @@
 import MarkdownIt from "markdown-it";
+import { enableMathMarkdown } from "@/components/markdown/math/parser";
 
 // Only block maps are needed here; inline parsing belongs to each rendered block.
 const markdownBlockParser = new MarkdownIt();
+enableMathMarkdown(markdownBlockParser);
 markdownBlockParser.core.ruler.disable("inline");
 
 // The renderer decides what counts as a definition, so ask the same parser: a block

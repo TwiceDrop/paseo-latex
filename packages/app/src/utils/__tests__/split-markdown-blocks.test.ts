@@ -2,6 +2,20 @@ import { describe, expect, it } from "vitest";
 import { splitMarkdownBlocks } from "../split-markdown-blocks";
 
 describe("splitMarkdownBlocks", () => {
+  it.each(["$$", String.raw`\[`])("keeps blank lines inside display math: %s", (opening) => {
+    const closing = opening === "$$" ? "$$" : String.raw`\]`;
+    const formula = `${opening}\na = b\n\nc = d\n${closing}`;
+    expect(splitMarkdownBlocks(`Before\n\n${formula}\n\nAfter`)).toEqual([
+      "Before",
+      formula,
+      "After",
+    ]);
+    expect(splitMarkdownBlocks(`Before\n\n${opening}\na = b\n\nc = d`)).toEqual([
+      "Before",
+      `${opening}\na = b\n\nc = d`,
+    ]);
+  });
+
   it("returns a single block for a single paragraph", () => {
     expect(splitMarkdownBlocks("Hello world")).toEqual(["Hello world"]);
   });

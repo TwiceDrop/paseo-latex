@@ -33,6 +33,13 @@ const turndown = new TurndownService({
   strongDelimiter: "**",
 });
 turndown.use(gfm);
+turndown.addRule("mathSource", {
+  filter: (node) => node.hasAttribute("data-paseo-math-source"),
+  replacement: (_content, node) => {
+    const source = node.getAttribute("data-paseo-math-source") ?? "";
+    return node.getAttribute("data-paseo-math-display") === "true" ? `\n\n${source}\n\n` : source;
+  },
+});
 turndown.addRule("escapedGfmTableCell", {
   filter: ["th", "td"],
   replacement: (content, node) => {
@@ -546,6 +553,7 @@ function selectedMessageParts(range: Range): SelectedMessagePart[] | null {
 }
 
 function restoreMarkdownElements(container: HTMLElement): void {
+  restoreMathSource(container);
   for (const ignored of container.querySelectorAll(`[${MARKDOWN_COPY_IGNORE_ATTRIBUTE}]`)) {
     ignored.remove();
   }
@@ -596,9 +604,19 @@ function restoreMarkdownElements(container: HTMLElement): void {
     element.replaceWith(...element.childNodes);
   }
 
-  const presentational = Array.from(container.querySelectorAll("div, span"));
+  const presentational = Array.from(
+    container.querySelectorAll(
+      "div:not([data-paseo-math-source]), span:not([data-paseo-math-source])",
+    ),
+  );
   for (const element of presentational.toReversed()) {
     element.replaceWith(...element.childNodes);
+  }
+}
+
+function restoreMathSource(container: HTMLElement): void {
+  for (const math of container.querySelectorAll("[data-paseo-math-source]")) {
+    math.textContent = math.getAttribute("data-paseo-math-source");
   }
 }
 

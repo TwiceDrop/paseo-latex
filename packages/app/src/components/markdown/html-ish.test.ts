@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 import { normalizeHtmlishMarkdown, splitHtmlishMarkdown } from "./html-ish";
 
 describe("splitHtmlishMarkdown", () => {
+  it("preserves HTML-shaped text inside formulas", () => {
+    const source = String.raw`$\text{<b>literal</b>}$ and **bold**`;
+    expect(splitHtmlishMarkdown(source)).toEqual([{ kind: "markdown", text: source }]);
+  });
+
   const inlineImageBody = [
     '<a href="#"><img alt="Priority" src="https://example.com/assets/priority.svg?v=9" align="top"></a> Spoofed browser User-Agent allows access control bypass',
     "",
