@@ -101,7 +101,7 @@ npm run latex:update -- --ref upstream/main --dry-run
 After an update, run the existing browser checks and build a test APK:
 
 ```powershell
-npm run test:browser --workspace=@getpaseo/app -- src/components/markdown/math/math.browser.test.tsx src/assistant-selection-copy/content.browser.test.ts --bail=1
+npm run test:browser --workspace=@getpaseo/app -- src/components/markdown/math/math.browser.test.tsx src/components/markdown/math/text-group.browser.test.ts src/assistant-selection-copy/content.browser.test.ts --bail=1
 npm run android:latex -- --arch arm64-v8a
 ```
 

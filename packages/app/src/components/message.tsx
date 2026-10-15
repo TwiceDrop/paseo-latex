@@ -75,6 +75,7 @@ import { useRevealedText } from "@/hooks/use-revealed-text";
 import { colorMarkdownLinkChildren } from "@/components/markdown/link-children";
 import { createAssistantMarkdownParser } from "@/utils/assistant-markdown-parser";
 import { mathMarkdownRules } from "@/components/markdown/math/rules";
+import { renderAndroidMathTextGroup } from "@/components/markdown/math/group";
 import { formatDuration, formatMessageTimestamp } from "@/utils/time";
 import { getTurnDurationLabel } from "./assistant-turn-footer-label";
 import { writeMarkdownToRichClipboard } from "@/utils/rich-clipboard";
@@ -1648,18 +1649,25 @@ export const AssistantMessage = memo(function AssistantMessage({
       textgroup: (
         node: ASTNode,
         children: ReactNode[],
-        _parent: ASTNode[],
+        parent: ASTNode[],
         styles: MarkdownStyles,
         inheritedStyles: TextStyle = {},
-      ) => (
-        <MarkdownInheritedText
-          key={node.key}
-          inheritedStyles={inheritedStyles}
-          textStyle={styles.textgroup}
-        >
-          {children}
-        </MarkdownInheritedText>
-      ),
+      ) =>
+        renderAndroidMathTextGroup({
+          node,
+          parent,
+          styles,
+          inheritedStyles,
+          onLinkPress: handleMarkdownLinkPress,
+        }) ?? (
+          <MarkdownInheritedText
+            key={node.key}
+            inheritedStyles={inheritedStyles}
+            textStyle={styles.textgroup}
+          >
+            {children}
+          </MarkdownInheritedText>
+        ),
       // strong/em/s have no custom rule in react-native-markdown-display's
       // defaults beyond wrapping children in a plain RN <Text>. On iOS the
       // paragraph/textgroup are native UITextViews (see markdown-text.ios.tsx),
@@ -1958,7 +1966,16 @@ export const AssistantMessage = memo(function AssistantMessage({
         );
       },
     };
-  }, [client, fileLinkActions, markdownParser, occurrenceKey, phase, serverId, workspaceRoot]);
+  }, [
+    client,
+    fileLinkActions,
+    handleMarkdownLinkPress,
+    markdownParser,
+    occurrenceKey,
+    phase,
+    serverId,
+    workspaceRoot,
+  ]);
 
   const blocks = useMemo(() => splitMarkdownBlocks(revealedMessage), [revealedMessage]);
   const keyedBlocks = useMemo(

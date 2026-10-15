@@ -63,6 +63,7 @@ if (!values["dry-run"]) {
     "src/utils/__tests__/split-markdown-blocks.test.ts",
     "src/components/markdown/html-ish.test.ts",
     "src/components/markdown/math/render.test.ts",
+    "src/components/markdown/math/text-group.test.ts",
   ];
   run({
     command: "npm",
