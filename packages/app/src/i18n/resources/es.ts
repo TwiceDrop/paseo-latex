@@ -1177,6 +1177,7 @@ export const es: TranslationResources = {
     },
   },
   sidebar: {
+    collapsedProjects: en.sidebar.collapsedProjects,
     statusGroupAccessibility: "Grupo {{label}}",
     statusBucket: {
       needsInput: "Necesita datos",

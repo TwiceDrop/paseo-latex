@@ -29,6 +29,14 @@ buffering a whole APK through `readFile()` duplicates large byte arrays in memor
 The Android document picker lives in `modules/paseo-file-download`; using
 `ACTION_CREATE_DOCUMENT` permits saving to Downloads without broad storage access.
 
+## Collapsed sidebar projects
+
+Press a project heading to move the whole group into **Collapsed projects** above
+the sidebar footer. Press its name there to restore it in its previous order.
+This reuses the device's existing collapsed-project preference; it sends no
+archive, remove, or lifecycle command to the host. Project filters still apply
+to the bottom section, so clear them to find a filtered-out project.
+
 ## Personal signing
 
 Set `JAVA_HOME` to your JDK 21 directory. On this Windows machine:

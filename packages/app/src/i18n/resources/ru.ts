@@ -1158,6 +1158,7 @@ export const ru: TranslationResources = {
     },
   },
   sidebar: {
+    collapsedProjects: en.sidebar.collapsedProjects,
     statusGroupAccessibility: "Группа «{{label}}»",
     statusBucket: {
       needsInput: "Ожидает ввода",

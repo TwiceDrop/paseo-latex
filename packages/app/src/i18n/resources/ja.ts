@@ -1154,6 +1154,7 @@ export const ja: TranslationResources = {
     },
   },
   sidebar: {
+    collapsedProjects: en.sidebar.collapsedProjects,
     statusGroupAccessibility: "{{label}} グループ",
     statusBucket: {
       needsInput: "入力待ち",

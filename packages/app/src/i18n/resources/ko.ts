@@ -1148,6 +1148,7 @@ export const ko: TranslationResources = {
     },
   },
   sidebar: {
+    collapsedProjects: en.sidebar.collapsedProjects,
     statusGroupAccessibility: "{{label}} 그룹",
     statusBucket: {
       needsInput: "입력 필요",

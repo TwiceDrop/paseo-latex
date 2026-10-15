@@ -1168,6 +1168,7 @@ export const fr: TranslationResources = {
     },
   },
   sidebar: {
+    collapsedProjects: en.sidebar.collapsedProjects,
     statusGroupAccessibility: "Groupe {{label}}",
     statusBucket: {
       needsInput: "Attend une réponse",

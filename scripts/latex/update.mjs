@@ -69,6 +69,7 @@ if (!values["dry-run"]) {
     "src/mobile-panels/gesture-intent.test.ts",
     "src/mobile-panels/gestures.test.tsx",
     "src/mobile-panels/model.test.ts",
+    "src/components/sidebar/sidebar-projection.test.ts",
   ];
   run({
     command: "npm",

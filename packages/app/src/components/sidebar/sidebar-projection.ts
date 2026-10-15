@@ -50,14 +50,20 @@ export interface SidebarProjectionInput {
 }
 
 export function buildSidebarProjection(input: SidebarProjectionInput): SidebarProjection {
+  const projects = input.projects.filter(
+    (project) => !input.collapsedProjectKeys.has(project.viewKey),
+  );
+  const expandedProjectKeys = new Set(projects.map((project) => project.viewKey));
   const pinnedGroups = splitPinnedSidebarGroups({
-    projects: input.projects,
+    projects,
     keys: input.pinnedKeys,
     pinnedWorkspaceOrder: input.pinnedWorkspaceOrder,
   });
   const pinnedWorkspaceKeys = new Set(input.pinnedKeys.pinnedWorkspaceKeys);
   const unpinnedWorkspaces = Array.from(input.workspaceEntriesByKey.values()).filter(
-    (workspace) => !pinnedWorkspaceKeys.has(workspace.workspaceKey),
+    (workspace) =>
+      expandedProjectKeys.has(workspace.projectViewKey) &&
+      !pinnedWorkspaceKeys.has(workspace.workspaceKey),
   );
   // One switch decides both what the list groups by and what the keyboard shortcuts walk, so the
   // two cannot disagree and a new grouping mode is a compile error here rather than a silent

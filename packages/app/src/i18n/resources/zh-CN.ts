@@ -1133,6 +1133,7 @@ export const zhCN: TranslationResources = {
     },
   },
   sidebar: {
+    collapsedProjects: { title: "已收起项目", expand: "展开{{name}}" },
     statusGroupAccessibility: "{{label}} 分组",
     statusBucket: {
       needsInput: "需要输入",

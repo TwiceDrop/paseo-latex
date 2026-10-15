@@ -87,6 +87,7 @@ import { hasVisibleOrderChanged, mergeWithRemainder } from "@/utils/sidebar-reor
 import { confirmDialog } from "@/utils/confirm-dialog";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { SidebarStatusWorkspaceList } from "@/components/sidebar/sidebar-status-list";
+import { CollapsedProjects } from "@/components/sidebar/collapsed-projects";
 import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
 import {
   SidebarWorkspaceContextMenu,
@@ -1944,6 +1945,10 @@ export function SidebarWorkspaceList({
   // paints them on each row, all keyed by `projectViewKey`. The targets come from the projection
   // that produced the rows, so the question "what is on screen" is answered once.
   const projectIconByProjectViewKey = useProjectIcons({ projects: projectIconTargets });
+  const collapsedProjects = useMemo(
+    () => projects.filter((project) => collapsedProjectKeys.has(project.viewKey)),
+    [projects, collapsedProjectKeys],
+  );
 
   // A filter that matches nothing swaps the list's body and nothing above it. It used to replace
   // this whole subtree, which unmounted the header — and the header is where the display menu's
@@ -2002,7 +2007,16 @@ export function SidebarWorkspaceList({
       />
     );
 
-  return content;
+  return (
+    <View style={styles.container}>
+      {content}
+      <CollapsedProjects
+        projects={collapsedProjects}
+        projectIconByProjectViewKey={projectIconByProjectViewKey}
+        onRestore={onToggleProjectCollapsed}
+      />
+    </View>
+  );
 }
 
 /**
@@ -2447,10 +2461,7 @@ function ProjectModeList({
         Every filter that can empty this branch needs a term here: a project filter pinned to a
         project whose chats are all pinned leaves `unpinnedProjects` empty, and without its term
         the header would go with it, taking the only route back to the filter page. */}
-      {unpinnedProjects.length > 0 ||
-      hasActiveHostFilter ||
-      hasActiveProjectFilter ||
-      sidebarFilterEmpty
+      {projects.length > 0 || hasActiveHostFilter || hasActiveProjectFilter || sidebarFilterEmpty
         ? listHeaderComponent
         : null}
       {sidebarFilterEmpty ? <SidebarFilterEmptyState /> : projectBody}

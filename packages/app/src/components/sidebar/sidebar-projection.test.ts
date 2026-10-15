@@ -113,6 +113,46 @@ function twoProjectInput(groupMode: "project" | "status") {
 }
 
 describe("buildSidebarProjection", () => {
+  it.each(["project", "status"] as const)(
+    "keeps a collapsed project's pinned and ordinary workspaces out of %s rows and shortcuts",
+    (groupMode) => {
+      const input = projectionInput({ groupMode });
+      const other = makeWorkspace("other", "done", [], "other-project");
+      input.projects.push(makeProject([other.placement], "other-project"));
+      input.workspaceEntriesByKey.set(other.entry.workspaceKey, other.entry);
+      input.collapsedProjectKeys.add("project");
+
+      const collapsed = buildSidebarProjection(input);
+      expect(collapsed.pinnedGroups.pinnedChats).toEqual([]);
+      expect(collapsed.pinnedGroups.unpinnedProjects.map((project) => project.viewKey)).toEqual([
+        "other-project",
+      ]);
+      expect(
+        collapsed.workspaceGroups.flatMap((group) => group.rows).map((row) => row.workspaceId),
+      ).not.toContain("unpinned");
+      expect(collapsed.shortcutModel.shortcutTargets).toEqual([
+        { serverId: "srv", workspaceId: "other" },
+      ]);
+      expect(collapsed.projectIconTargets.map((target) => target.projectViewKey)).toContain(
+        "project",
+      );
+
+      // Restoring presentation keeps the original workspaces, pins and project order.
+      input.collapsedProjectKeys.delete("project");
+      const restored = buildSidebarProjection(input);
+      expect(restored.pinnedGroups.pinnedChats.map((row) => row.workspaceId)).toEqual(["pinned"]);
+      expect(restored.pinnedGroups.unpinnedProjects.map((project) => project.viewKey)).toEqual([
+        "project",
+        "other-project",
+      ]);
+      expect(restored.shortcutModel.shortcutTargets).toContainEqual({
+        serverId: "srv",
+        workspaceId: "unpinned",
+      });
+      expect(input.projects[0]?.workspaces).toHaveLength(2);
+    },
+  );
+
   // The rule that outlived the bug it was written for: a project icon is fetched per project, so
   // whatever a mode groups by, the rows it produces can only reference projects already covered.
   for (const groupMode of ["project", "status"] as const) {

@@ -1149,6 +1149,7 @@ export const en = {
     },
   },
   sidebar: {
+    collapsedProjects: { title: "Collapsed projects", expand: "Expand {{name}}" },
     statusGroupAccessibility: "{{label}} group",
     statusBucket: {
       needsInput: "Needs input",
