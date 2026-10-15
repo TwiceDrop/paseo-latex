@@ -7,7 +7,11 @@ import { useHorizontalScrollOptional } from "@/contexts/horizontal-scroll-contex
 import { usePanelStore } from "@/stores/panel-store";
 import { canBeginMobilePanelGesture, isMobilePanelGestureCurrent } from "./model";
 import { useMobilePanelsRuntime } from "./provider";
-import { resolveMobilePanelGestureIntent } from "./gesture-intent";
+import {
+  getMobilePanelOpeningPosition,
+  MOBILE_PANEL_OPEN_FRACTION,
+  resolveMobilePanelGestureIntent,
+} from "./gesture-intent";
 
 const MOBILE_WEB_EDGE_SWIPE_WIDTH = 32;
 
@@ -80,6 +84,7 @@ export function useOpenAgentListGesture(enabled: boolean) {
             deltaY,
             direction: 1,
             openGesturesBlocked: openGesturesBlocked.value,
+            activationDistance: windowWidth * MOBILE_PANEL_OPEN_FRACTION,
           });
           if (
             !canBeginMobilePanelGesture(motionState.value, "agent", position.value) ||
@@ -98,10 +103,15 @@ export function useOpenAgentListGesture(enabled: boolean) {
           startedRevision.value = beginGesture({ origin: "agent" });
         })
         .onUpdate((event) => {
-          updateGesture(startedRevision.value, -event.translationX / windowWidth);
+          updateGesture(
+            startedRevision.value,
+            getMobilePanelOpeningPosition(event.absoluteX - touchStartX.value, windowWidth),
+          );
         })
         .onEnd((event, success) => {
-          const shouldOpen = event.translationX > windowWidth / 3 || event.velocityX > 500;
+          // Native Pan resets translation at activation; use travel from touch-down.
+          const shouldOpen =
+            event.absoluteX - touchStartX.value > windowWidth / 3 || event.velocityX > 500;
           const result = finishGesture({
             startedRevision: startedRevision.value,
             target: shouldOpen ? "agent-list" : "agent",
@@ -273,6 +283,7 @@ export function useOpenFileExplorerGesture({ enabled, onOpen }: OpenFileExplorer
             deltaY,
             direction: -1,
             openGesturesBlocked: openGesturesBlocked.value,
+            activationDistance: windowWidth * MOBILE_PANEL_OPEN_FRACTION,
           });
           if (
             !canBeginMobilePanelGesture(motionState.value, "agent", position.value) ||
@@ -292,10 +303,14 @@ export function useOpenFileExplorerGesture({ enabled, onOpen }: OpenFileExplorer
           });
         })
         .onUpdate((event) => {
-          updateGesture(startedRevision.value, -event.translationX / windowWidth);
+          updateGesture(
+            startedRevision.value,
+            getMobilePanelOpeningPosition(event.absoluteX - touchStartX.value, windowWidth),
+          );
         })
         .onEnd((event, success) => {
-          const shouldOpen = event.translationX < -windowWidth / 3 || event.velocityX < -500;
+          const shouldOpen =
+            event.absoluteX - touchStartX.value < -windowWidth / 3 || event.velocityX < -500;
           const result = finishGesture({
             startedRevision: startedRevision.value,
             target: shouldOpen ? "file-explorer" : "agent",
@@ -421,4 +436,17 @@ export function useCloseFileExplorerGesture() {
 
 export function useFileExplorerCloseGestureRef() {
   return useMobilePanelsRuntime().rightCloseGestureRef;
+}
+
+// Let a native content surface keep its own horizontal interaction without
+// racing the panel-opening pans. The parent vertical scroll can still interrupt.
+export function useMobilePanelContentGesture() {
+  const { leftOpenGestureRef, rightOpenGestureRef } = useMobilePanelsRuntime();
+  return useMemo(
+    () =>
+      Gesture.Native()
+        .shouldActivateOnStart(true)
+        .blocksExternalGesture(leftOpenGestureRef, rightOpenGestureRef),
+    [leftOpenGestureRef, rightOpenGestureRef],
+  );
 }

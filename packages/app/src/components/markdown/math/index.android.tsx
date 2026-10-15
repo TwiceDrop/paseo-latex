@@ -1,6 +1,8 @@
 import { memo, useCallback, useMemo, useState } from "react";
 import { View, useWindowDimensions, StyleSheet } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
+import { GestureDetector } from "react-native-gesture-handler";
+import { useMobilePanelContentGesture } from "@/mobile-panels/gestures";
 import { MarkdownTextSpan } from "@/components/markdown-text";
 import { createMathDocument, parseMathDimensions, type MathDimensions } from "./document";
 import { renderMath } from "./render";
@@ -17,6 +19,7 @@ export const MarkdownMath = memo(function MarkdownMath({
   displayMode,
   inheritedStyles,
 }: MarkdownMathProps) {
+  const contentGesture = useMobilePanelContentGesture();
   const window = useWindowDimensions();
   const fontSize = (inheritedStyles.fontSize ?? 16) * window.fontScale;
   const color = typeof inheritedStyles.color === "string" ? inheritedStyles.color : "#888888";
@@ -54,20 +57,23 @@ export const MarkdownMath = memo(function MarkdownMath({
   }
   return (
     <View style={frameStyle} accessibilityLabel={source}>
-      <WebView
-        source={webSource}
-        originWhitelist={ORIGINS}
-        style={styles.webView}
-        onMessage={onMessage}
-        onError={onError}
-        onShouldStartLoadWithRequest={allowLoad}
-        scrollEnabled
-        nestedScrollEnabled
-        scalesPageToFit={false}
-        setSupportMultipleWindows={false}
-        javaScriptEnabled
-        textZoom={100}
-      />
+      <GestureDetector gesture={contentGesture}>
+        <WebView
+          source={webSource}
+          originWhitelist={ORIGINS}
+          style={styles.webView}
+          onMessage={onMessage}
+          onError={onError}
+          onShouldStartLoadWithRequest={allowLoad}
+          scrollEnabled
+          nestedScrollEnabled={false}
+          overScrollMode="never"
+          scalesPageToFit={false}
+          setSupportMultipleWindows={false}
+          javaScriptEnabled
+          textZoom={100}
+        />
+      </GestureDetector>
     </View>
   );
 });

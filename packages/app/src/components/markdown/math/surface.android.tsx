@@ -1,6 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
+import { GestureDetector } from "react-native-gesture-handler";
+import { useMobilePanelContentGesture } from "@/mobile-panels/gestures";
 import { MarkdownTextSpan } from "@/components/markdown-text";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { openExternalUrl } from "@/utils/open-external-url";
@@ -24,6 +26,7 @@ export const MathSurface = memo(function MathSurface({
   onLinkPress,
   ...options
 }: MathSurfaceProps) {
+  const contentGesture = useMobilePanelContentGesture();
   const webView = useRef<WebView>(null);
   const [webSource] = useState(() => ({ html: createMathDocument(options) }));
   const [ready, setReady] = useState(false);
@@ -88,22 +91,27 @@ export const MathSurface = memo(function MathSurface({
   if (failedId === id) return <MarkdownTextSpan style={fallbackStyle}>{source}</MarkdownTextSpan>;
   return (
     <View style={frameStyle} accessibilityLabel={source}>
-      <WebView
-        ref={webView}
-        source={webSource}
-        originWhitelist={ORIGINS}
-        style={styles.webView}
-        onMessage={onMessage}
-        onLoadEnd={onLoadEnd}
-        onError={onError}
-        onShouldStartLoadWithRequest={allowLoad}
-        scrollEnabled
-        nestedScrollEnabled
-        scalesPageToFit={false}
-        setSupportMultipleWindows={false}
-        javaScriptEnabled
-        textZoom={100}
-      />
+      {/* Android WebView's nestedScrollEnabled blocks parent interception even when
+          this auto-sized paragraph cannot scroll vertically. */}
+      <GestureDetector gesture={contentGesture}>
+        <WebView
+          ref={webView}
+          source={webSource}
+          originWhitelist={ORIGINS}
+          style={styles.webView}
+          onMessage={onMessage}
+          onLoadEnd={onLoadEnd}
+          onError={onError}
+          onShouldStartLoadWithRequest={allowLoad}
+          scrollEnabled
+          nestedScrollEnabled={false}
+          overScrollMode="never"
+          scalesPageToFit={false}
+          setSupportMultipleWindows={false}
+          javaScriptEnabled
+          textZoom={100}
+        />
+      </GestureDetector>
     </View>
   );
 });

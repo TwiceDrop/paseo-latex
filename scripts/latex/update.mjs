@@ -66,6 +66,9 @@ if (!values["dry-run"]) {
     "src/components/markdown/math/render.test.ts",
     "src/components/markdown/math/text-group.test.ts",
     "src/components/download-toast.test.tsx",
+    "src/mobile-panels/gesture-intent.test.ts",
+    "src/mobile-panels/gestures.test.tsx",
+    "src/mobile-panels/model.test.ts",
   ];
   run({
     command: "npm",

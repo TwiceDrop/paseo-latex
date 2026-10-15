@@ -71,6 +71,16 @@ Manual gesture arbitration has two phases:
 1. Before activation, determine whether horizontal intent may begin.
 2. After activation, stop running begin checks and let the active revision own updates.
 
+Opening pans require horizontal travel of one quarter of the viewport width and
+horizontal movement greater than 1.5 times vertical movement. The reveal starts
+at zero after this travel threshold; it does not jump by a quarter screen. Read
+travel from touch-down coordinates because native Pan resets its translation
+when manual activation succeeds. Closing pans retain their shorter threshold.
+
+Android math WebViews use a native content gesture that blocks the two opening
+pans while leaving parent vertical scrolling interruptible. Long formulas can
+scroll horizontally, and vertical drags over formulas scroll the chat.
+
 Re-running the begin gate after activation self-cancels the gesture because an active gesture is, by
 definition, no longer eligible to begin.
 
