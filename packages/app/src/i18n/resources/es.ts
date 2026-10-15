@@ -1919,6 +1919,7 @@ export const es: TranslationResources = {
     dontAskAgain: "no vuelvas a preguntar",
   },
   downloads: {
+    saving: "Elige dónde guardar el archivo para completar la descarga.",
     requestTokenFailed: "No se pudo solicitar el token de descarga.",
     hostUnavailable: "El host de descarga no está disponible.",
     cancelled: "La descarga fue cancelada.",

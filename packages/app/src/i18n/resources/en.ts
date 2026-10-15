@@ -1896,6 +1896,7 @@ export const en = {
     dontAskAgain: "Don't ask again",
   },
   downloads: {
+    saving: "Choose a save location to finish downloading.",
     requestTokenFailed: "Failed to request download token.",
     hostUnavailable: "Download host is unavailable.",
     cancelled: "Download was cancelled.",

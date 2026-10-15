@@ -1903,6 +1903,7 @@ export const ru: TranslationResources = {
     dontAskAgain: "Больше не спрашивать",
   },
   downloads: {
+    saving: "Выберите место сохранения, чтобы завершить загрузку.",
     requestTokenFailed: "Не удалось запросить токен загрузки.",
     hostUnavailable: "Хост загрузки недоступен.",
     cancelled: "Загрузка отменена.",

@@ -1881,6 +1881,7 @@ export const ko: TranslationResources = {
     dontAskAgain: "다시 묻지 않기",
   },
   downloads: {
+    saving: "저장 위치를 선택하여 다운로드를 완료하세요.",
     requestTokenFailed: "다운로드 토큰을 요청하지 못했습니다.",
     hostUnavailable: "다운로드 호스트를 사용할 수 없습니다.",
     cancelled: "다운로드가 취소되었습니다.",

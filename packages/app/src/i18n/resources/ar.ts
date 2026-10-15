@@ -1871,6 +1871,7 @@ export const ar: TranslationResources = {
     dontAskAgain: "لا تسأل مرة أخرى",
   },
   downloads: {
+    saving: "اختر موقع الحفظ لإكمال التنزيل.",
     requestTokenFailed: "فشل طلب رمز التنزيل.",
     hostUnavailable: "مضيف التنزيل غير متاح.",
     cancelled: "تم إلغاء التنزيل.",

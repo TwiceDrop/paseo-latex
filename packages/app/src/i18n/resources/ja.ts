@@ -1890,6 +1890,7 @@ export const ja: TranslationResources = {
     dontAskAgain: "次回から確認しない",
   },
   downloads: {
+    saving: "保存先を選択してダウンロードを完了してください。",
     requestTokenFailed: "ダウンロードトークンのリクエストに失敗しました。",
     hostUnavailable: "ダウンロードホストが利用できません。",
     cancelled: "ダウンロードがキャンセルされました。",

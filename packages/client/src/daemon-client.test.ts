@@ -2746,6 +2746,140 @@ test("readFile resolves from binary file frames when the daemon supports them", 
   expect(new TextDecoder().decode(result.bytes)).toBe("hello");
 });
 
+test("downloadFile streams chunks to its destination before completion", async () => {
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_download",
+    logger: createMockLogger(),
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+  const connected = client.connect();
+  mock.triggerOpen();
+  await connected;
+  const chunks: number[][] = [];
+  const progress: number[] = [];
+  const result = client.downloadFile("/tmp/project", "report.pdf", {
+    write: (chunk) => chunks.push([...chunk]),
+    progress: (written) => progress.push(written),
+  });
+  const requestId = JSON.parse(assertStr(mock.sent[0])).message.requestId;
+  mock.triggerMessage(
+    encodeFileTransferFrame({
+      opcode: FileTransferOpcode.FileBegin,
+      requestId,
+      metadata: {
+        mime: "application/pdf",
+        size: 4,
+        encoding: "binary",
+        modifiedAt: "2026-05-02T00:00:00.000Z",
+      },
+    }),
+  );
+  mock.triggerMessage(
+    encodeFileTransferFrame({
+      opcode: FileTransferOpcode.FileChunk,
+      requestId,
+      payload: new Uint8Array([1, 2]),
+    }),
+  );
+  expect(chunks).toEqual([[1, 2]]);
+  mock.triggerMessage(
+    encodeFileTransferFrame({
+      opcode: FileTransferOpcode.FileChunk,
+      requestId,
+      payload: new Uint8Array([3, 4]),
+    }),
+  );
+  mock.triggerMessage(encodeFileTransferFrame({ opcode: FileTransferOpcode.FileEnd, requestId }));
+  await expect(result).resolves.toMatchObject({
+    size: 4,
+    mime: "application/pdf",
+    path: "report.pdf",
+  });
+  expect(chunks).toEqual([
+    [1, 2],
+    [3, 4],
+  ]);
+  expect(progress).toEqual([0, 2, 4]);
+});
+
+test("downloadFile rejects a failed destination write instead of reporting success", async () => {
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_download_error",
+    logger: createMockLogger(),
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+  const connected = client.connect();
+  mock.triggerOpen();
+  await connected;
+  const result = client.downloadFile("/tmp/project", "report.pdf", {
+    write: () => {
+      throw new Error("Disk full");
+    },
+  });
+  const rejected = expect(result).rejects.toThrow("Disk full");
+  const requestId = JSON.parse(assertStr(mock.sent[0])).message.requestId;
+  mock.triggerMessage(
+    encodeFileTransferFrame({
+      opcode: FileTransferOpcode.FileBegin,
+      requestId,
+      metadata: {
+        mime: "application/pdf",
+        size: 2,
+        encoding: "binary",
+        modifiedAt: "2026-05-02T00:00:00.000Z",
+      },
+    }),
+  );
+  mock.triggerMessage(
+    encodeFileTransferFrame({
+      opcode: FileTransferOpcode.FileChunk,
+      requestId,
+      payload: new Uint8Array([1, 2]),
+    }),
+  );
+  await rejected;
+});
+
+test("downloadFile rejects a truncated file instead of keeping a corrupt download", async () => {
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_download_truncated",
+    logger: createMockLogger(),
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+  const connected = client.connect();
+  mock.triggerOpen();
+  await connected;
+  const result = client.downloadFile("/tmp/project", "report.pdf", { write: () => {} });
+  const rejected = expect(result).rejects.toThrow("Downloaded file is incomplete.");
+  const requestId = JSON.parse(assertStr(mock.sent[0])).message.requestId;
+  mock.triggerMessage(
+    encodeFileTransferFrame({
+      opcode: FileTransferOpcode.FileBegin,
+      requestId,
+      metadata: {
+        mime: "application/pdf",
+        size: 2,
+        encoding: "binary",
+        modifiedAt: "2026-05-02T00:00:00.000Z",
+      },
+    }),
+  );
+  mock.triggerMessage(encodeFileTransferFrame({ opcode: FileTransferOpcode.FileEnd, requestId }));
+  await rejected;
+});
+
 test("readFile drops an old daemon's over-budget binary chunks and reports the refusal", async () => {
   const mock = createMockTransport();
   const client = new DaemonClient({

@@ -55,6 +55,7 @@ if (!values["dry-run"]) {
     ],
   });
   run({ command: "npm", args: ["run", "typecheck", "--workspace=@getpaseo/app"] });
+  run({ command: "npm", args: ["run", "typecheck", "--workspace=@getpaseo/client"] });
   run({ command: "npm", args: ["run", "lint"] });
   const tests = [
     "app.config.test.ts",
@@ -64,6 +65,7 @@ if (!values["dry-run"]) {
     "src/components/markdown/html-ish.test.ts",
     "src/components/markdown/math/render.test.ts",
     "src/components/markdown/math/text-group.test.ts",
+    "src/components/download-toast.test.tsx",
   ];
   run({
     command: "npm",

@@ -1849,6 +1849,7 @@ export const zhCN: TranslationResources = {
     dontAskAgain: "不再询问",
   },
   downloads: {
+    saving: "请选择保存位置以完成下载。",
     requestTokenFailed: "请求下载 token 失败。",
     hostUnavailable: "下载 Host 不可用。",
     cancelled: "下载已取消。",

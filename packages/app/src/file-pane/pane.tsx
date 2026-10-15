@@ -40,6 +40,8 @@ import { confirmDialog } from "@/utils/confirm-dialog";
 import { usePublishPanelInstanceAttributes } from "@/panels/panel-instance-attributes";
 import type { Theme } from "@/styles/theme";
 import { ZoomableImage } from "@/components/zoomable-viewport/image";
+import { useFileDownload } from "@/hooks/use-file-download";
+import { useDownloadStore } from "@/stores/download-store";
 
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const foregroundMutedColorMapping = (theme: Theme) => ({
@@ -379,6 +381,19 @@ function FilePanePresentation({
   navigationRevision: number;
   imagePreviewUri: string | null;
 }) {
+  const downloadFile = useFileDownload({ serverId, workspaceRoot: readTarget?.cwd ?? "" });
+  const downloading = useDownloadStore((state) =>
+    [...state.downloads.values()].some(
+      (download) =>
+        download.serverId === serverId &&
+        download.scopeId === readTarget?.cwd &&
+        download.path === readTarget?.path &&
+        (download.status === "downloading" || download.status === "saving"),
+    ),
+  );
+  const onDownload = useCallback(() => {
+    if (readTarget) downloadFile({ fileName: filename, path: readTarget.path });
+  }, [downloadFile, filename, readTarget]);
   if (!client && readTarget) {
     return (
       <View style={styles.container} testID="workspace-file-pane">
@@ -407,6 +422,8 @@ function FilePanePresentation({
         isMobile={isMobile}
         location={location}
         navigationRevision={navigationRevision}
+        onDownload={onDownload}
+        downloading={downloading}
       />
     );
   }
@@ -415,12 +432,14 @@ function FilePanePresentation({
     if (errorMessage === "File is too large to display") {
       return (
         <View style={styles.container} testID="workspace-file-pane">
+          <FilePanelBar onDownload={onDownload} downloading={downloading} />
           <TooLargeSource />
         </View>
       );
     }
     return (
       <View style={styles.container} testID="workspace-file-pane">
+        <FilePanelBar onDownload={onDownload} downloading={downloading} />
         <View style={styles.centerState}>
           <Text style={styles.errorText}>{errorMessage}</Text>
           <Button variant="outline" size="sm" onPress={onRetryRead} loading={retryingRead}>
@@ -433,9 +452,11 @@ function FilePanePresentation({
 
   return (
     <View style={styles.container} testID="workspace-file-pane">
-      {preview ? (
+      {readTarget ? (
         <FilePanelBar
-          size={preview.size}
+          size={preview?.size}
+          onDownload={onDownload}
+          downloading={downloading}
           lineCount={lineCount}
           mode={previewMode}
           onModeChange={onPreviewModeChange}
@@ -469,6 +490,8 @@ function EditableFilePane({
   isMobile,
   location,
   navigationRevision,
+  onDownload,
+  downloading,
 }: {
   client: DaemonClient;
   cwd: string;
@@ -484,6 +507,8 @@ function EditableFilePane({
   isMobile: boolean;
   location: WorkspaceFileLocation;
   navigationRevision: number;
+  onDownload: () => void;
+  downloading: boolean;
 }) {
   const { settings } = useAppSettings();
   const { t } = useTranslation();
@@ -591,6 +616,8 @@ function EditableFilePane({
   return (
     <View style={styles.container} testID="workspace-file-pane">
       <FilePanelBar
+        onDownload={onDownload}
+        downloading={downloading}
         size={
           snapshot.observedVersion.status === "ready" ? snapshot.observedVersion.size : preview.size
         }

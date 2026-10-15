@@ -1904,6 +1904,7 @@ export const ptBR: TranslationResources = {
     dontAskAgain: "Não perguntar novamente",
   },
   downloads: {
+    saving: "Escolha onde salvar para concluir o download.",
     requestTokenFailed: "Falha ao solicitar token de download.",
     hostUnavailable: "Host de download indisponível.",
     cancelled: "Download cancelado.",

@@ -18,6 +18,8 @@ function getDownloadStatusText(download: Download, t: TFunction): string {
     return t("common.states.starting");
   }
   if (download.status === "complete") return t("common.states.downloadComplete");
+  if (download.status === "saving") return t("downloads.saving");
+  if (download.status === "cancelled") return t("downloads.cancelled");
   return download.message ?? t("common.states.downloadFailed");
 }
 
@@ -38,7 +40,10 @@ export function DownloadToast() {
       dismissTimeoutRef.current = null;
     }
 
-    if (activeDownload && activeDownload.status !== "downloading") {
+    if (
+      activeDownload &&
+      (activeDownload.status === "complete" || activeDownload.status === "cancelled")
+    ) {
       dismissTimeoutRef.current = setTimeout(() => {
         dismissDownload(activeDownload.id);
       }, AUTO_DISMISS_DELAY);
@@ -68,29 +73,36 @@ export function DownloadToast() {
 
   return (
     <View style={containerStyle} pointerEvents="box-none">
-      <View style={styles.toast}>
-        {activeDownload.status === "downloading" ? (
+      <View style={styles.toast} testID="download-toast">
+        {activeDownload.status === "downloading" || activeDownload.status === "saving" ? (
           <LoadingSpinner size="small" color={theme.colors.foreground} />
         ) : null}
         {activeDownload.status === "complete" ? (
           <Check size={18} color={theme.colors.primary} />
         ) : null}
-        {activeDownload.status !== "downloading" && activeDownload.status !== "complete" ? (
+        {activeDownload.status === "error" ? (
           <XCircle size={18} color={theme.colors.destructive} />
         ) : null}
         <View style={styles.textContainer}>
           <Text style={styles.fileName} numberOfLines={1}>
             {activeDownload.fileName}
           </Text>
-          <Text style={styles.status}>{getDownloadStatusText(activeDownload, t)}</Text>
+          <Text style={styles.status} testID="download-status">
+            {getDownloadStatusText(activeDownload, t)}
+          </Text>
           {activeDownload.status === "downloading" && activeDownload.progress && (
             <View style={styles.progressBar}>
               <ProgressFill percent={activeDownload.progress.percent} />
             </View>
           )}
         </View>
-        {activeDownload.status !== "downloading" && (
-          <Pressable onPress={handleDismiss} hitSlop={8} style={styles.dismiss}>
+        {activeDownload.status !== "downloading" && activeDownload.status !== "saving" && (
+          <Pressable
+            onPress={handleDismiss}
+            hitSlop={8}
+            style={styles.dismiss}
+            accessibilityLabel={t("common.actions.close")}
+          >
             <X size={16} color={theme.colors.foregroundMuted} />
           </Pressable>
         )}

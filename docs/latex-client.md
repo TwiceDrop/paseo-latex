@@ -15,6 +15,20 @@ want. Check your actual host version when validating a new upstream release;
 [protocol compatibility](protocol-compatibility.md) does not promise every new
 feature on an older daemon.
 
+## Android file downloads
+
+Open a file link in chat, then choose **Download** in the file preview toolbar.
+The file explorer's long-press menu uses the same download action. Android opens
+its system **Save as** dialog after receiving the file; choose a location to finish.
+Cancelling that dialog does not mark the file as saved.
+
+Native downloads use the daemon's existing binary file frames on the authenticated
+connection, including encrypted relay connections. They do not require an exposed
+HTTP port or a daemon upgrade. Keep the streaming destination in the client:
+buffering a whole APK through `readFile()` duplicates large byte arrays in memory.
+The Android document picker lives in `modules/paseo-file-download`; using
+`ACTION_CREATE_DOCUMENT` permits saving to Downloads without broad storage access.
+
 ## Personal signing
 
 Set `JAVA_HOME` to your JDK 21 directory. On this Windows machine:

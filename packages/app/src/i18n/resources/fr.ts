@@ -1915,6 +1915,7 @@ export const fr: TranslationResources = {
     dontAskAgain: "Ne plus demander",
   },
   downloads: {
+    saving: "Choisissez un emplacement pour terminer le téléchargement.",
     requestTokenFailed: "Impossible d’obtenir le token de téléchargement.",
     hostUnavailable: "L’hôte de téléchargement est indisponible.",
     cancelled: "Téléchargement annulé.",

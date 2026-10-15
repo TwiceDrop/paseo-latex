@@ -7,6 +7,8 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import type { Theme } from "@/styles/theme";
 import { FileConflictAlert, type FileConflictAlertState } from "./conflict-alert";
 import type { FileEditorStatus } from "./editor/model";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react-native";
 
 const ThemedSpinner = withUnistyles(LoadingSpinner);
 const spinnerMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
@@ -20,8 +22,12 @@ export function FilePanelBar({
   cursor,
   vimMode,
   conflict,
+  onDownload,
+  downloading,
 }: {
-  size: number;
+  size?: number;
+  onDownload?: () => void;
+  downloading?: boolean;
   lineCount?: number;
   mode?: "preview" | "source";
   onModeChange?(mode: "preview" | "source"): void;
@@ -44,12 +50,16 @@ export function FilePanelBar({
       <PaneContentToolbar testID="file-panel-bar">
         <View style={styles.row}>
           <View style={styles.metadata}>
-            <Text
-              style={styles.whisper}
-              accessibilityLabel={t("panels.file.editor.fileSize", { size: formatFileSize(size) })}
-            >
-              {formatFileSize(size)}
-            </Text>
+            {size !== undefined ? (
+              <Text
+                style={styles.whisper}
+                accessibilityLabel={t("panels.file.editor.fileSize", {
+                  size: formatFileSize(size),
+                })}
+              >
+                {formatFileSize(size)}
+              </Text>
+            ) : null}
             {lineCount !== undefined ? (
               <Text
                 style={styles.whisper}
@@ -107,6 +117,19 @@ export function FilePanelBar({
               testID="file-preview-mode"
               options={previewModes}
             />
+          ) : null}
+          {onDownload ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              leftIcon={Download}
+              onPress={onDownload}
+              disabled={downloading}
+              loading={downloading}
+              testID="file-panel-download"
+            >
+              {t("workspace.fileActions.download")}
+            </Button>
           ) : null}
         </View>
       </PaneContentToolbar>

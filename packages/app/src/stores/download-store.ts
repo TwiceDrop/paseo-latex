@@ -1,7 +1,5 @@
 import { create } from "zustand";
-import { File as FSFile, Paths } from "expo-file-system";
-import * as LegacyFileSystem from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
+import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { HostProfile } from "@/types/host-connection";
 import { buildDaemonWebSocketUrl } from "@/utils/daemon-endpoints";
 import { openExternalUrl } from "@/utils/open-external-url";
@@ -21,7 +19,8 @@ export interface Download {
   serverId: string;
   scopeId: string;
   fileName: string;
-  status: "downloading" | "complete" | "error";
+  path: string;
+  status: "downloading" | "saving" | "complete" | "cancelled" | "error";
   message?: string;
   progress?: DownloadProgress;
   startedAt: number;
@@ -37,6 +36,8 @@ interface DownloadState {
     fileName: string;
     path: string;
     daemonProfile: HostProfile | undefined;
+    client: DaemonClient | null;
+    cwd: string;
     requestFileDownloadToken: (path: string) => Promise<{
       token: string | null;
       fileName: string | null;
@@ -67,13 +68,27 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
     path,
     daemonProfile,
     requestFileDownloadToken,
+    client,
+    cwd,
   }) => {
+    const existing = [...get().downloads.values()].find(
+      (download) =>
+        download.serverId === serverId &&
+        download.scopeId === scopeId &&
+        download.path === path &&
+        (download.status === "downloading" || download.status === "saving"),
+    );
+    if (existing) {
+      set({ activeDownloadId: existing.id });
+      return;
+    }
     const id = generateDownloadId();
     const download: Download = {
       id,
       serverId,
       scopeId,
       fileName,
+      path,
       status: "downloading",
       startedAt: Date.now(),
     };
@@ -84,6 +99,47 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
     }));
 
     try {
+      if (!isWeb) {
+        if (!client || !cwd) throw new Error(i18n.t("downloads.hostUnavailable"));
+        const { downloadNativeFile } = await import("@/downloads/native-download");
+        const startedAt = Date.now();
+        let lastUpdate = 0;
+        const uri = await downloadNativeFile({
+          client,
+          cwd,
+          path,
+          fileName: fileName.trim().replace(/[\\/:*?"<>|]+/g, "_") || "download",
+          onProgress: (bytesWritten, totalBytes) => {
+            const now = Date.now();
+            if (now - lastUpdate < 100 && bytesWritten !== totalBytes) return;
+            lastUpdate = now;
+            const speed = bytesWritten / Math.max((now - startedAt) / 1000, 0.001);
+            get().updateProgress(id, {
+              percent: totalBytes ? bytesWritten / totalBytes : 0,
+              bytesWritten,
+              totalBytes,
+              speed,
+              eta: speed ? (totalBytes - bytesWritten) / speed : 0,
+            });
+          },
+          onSaving: () =>
+            set((state) => ({
+              downloads: new Map(state.downloads).set(id, {
+                ...state.downloads.get(id)!,
+                status: "saving",
+              }),
+            })),
+        });
+        if (uri) get().completeDownload(id);
+        else
+          set((state) => ({
+            downloads: new Map(state.downloads).set(id, {
+              ...state.downloads.get(id)!,
+              status: "cancelled",
+            }),
+          }));
+        return;
+      }
       const tokenResponse = await requestFileDownloadToken(path);
       if (tokenResponse.error || !tokenResponse.token) {
         throw new Error(tokenResponse.error ?? i18n.t("downloads.requestTokenFailed"));
@@ -101,59 +157,8 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
         isWeb ? downloadTarget.authCredentials : null,
       );
 
-      if (isWeb) {
-        triggerBrowserDownload(downloadUrl, resolvedFileName);
-        get().completeDownload(id);
-        return;
-      }
-
-      const downloadStartTime = Date.now();
-      const targetFile = resolveDownloadTargetFile(resolvedFileName);
-      const downloadResumable = LegacyFileSystem.createDownloadResumable(
-        downloadUrl,
-        targetFile.uri,
-        downloadTarget.authHeader
-          ? { headers: { Authorization: downloadTarget.authHeader } }
-          : undefined,
-        (data) => {
-          const now = Date.now();
-          const { totalBytesWritten, totalBytesExpectedToWrite } = data;
-
-          if (totalBytesExpectedToWrite <= 0) {
-            return;
-          }
-
-          const percent = totalBytesWritten / totalBytesExpectedToWrite;
-          const elapsed = (now - downloadStartTime) / 1000;
-          const speed = elapsed > 0 ? totalBytesWritten / elapsed : 0;
-          const remaining = totalBytesExpectedToWrite - totalBytesWritten;
-          const eta = speed > 0 ? remaining / speed : 0;
-
-          get().updateProgress(id, {
-            percent,
-            bytesWritten: totalBytesWritten,
-            totalBytes: totalBytesExpectedToWrite,
-            speed,
-            eta,
-          });
-        },
-      );
-
-      const result = await downloadResumable.downloadAsync();
-      if (!result) {
-        throw new Error(i18n.t("downloads.cancelled"));
-      }
-
+      triggerBrowserDownload(downloadUrl, resolvedFileName);
       get().completeDownload(id);
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(result.uri, {
-          mimeType: tokenResponse.mimeType ?? undefined,
-          dialogTitle: resolvedFileName
-            ? i18n.t("downloads.shareFileNamed", { fileName: resolvedFileName })
-            : i18n.t("downloads.shareFile"),
-        });
-      }
     } catch (error) {
       const message = error instanceof Error ? error.message : i18n.t("downloads.failed");
       if (isWeb) {
@@ -215,7 +220,7 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
     set((state) => {
       const updated = new Map(state.downloads);
       for (const [id, download] of updated) {
-        if (download.status !== "downloading") {
+        if (download.status !== "downloading" && download.status !== "saving") {
           updated.delete(id);
         }
       }
@@ -314,44 +319,6 @@ function triggerBrowserDownload(url: string, fileName: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
-}
-
-function resolveDownloadTargetFile(fileName: string): FSFile {
-  const directory = Paths.cache ?? Paths.document;
-  if (!directory) {
-    throw new Error("No download directory available.");
-  }
-
-  const safeName = sanitizeDownloadFileName(fileName);
-  const split = splitFileName(safeName);
-  let targetFile = new FSFile(directory, safeName);
-  let suffix = 1;
-
-  while (targetFile.exists) {
-    targetFile = new FSFile(directory, `${split.base} (${suffix})${split.ext}`);
-    suffix += 1;
-  }
-
-  return targetFile;
-}
-
-function sanitizeDownloadFileName(fileName: string): string {
-  const trimmed = fileName.trim();
-  if (!trimmed) {
-    return "download";
-  }
-  return trimmed.replace(/[\\/:*?"<>|]+/g, "_");
-}
-
-function splitFileName(fileName: string): { base: string; ext: string } {
-  const lastDot = fileName.lastIndexOf(".");
-  if (lastDot <= 0) {
-    return { base: fileName, ext: "" };
-  }
-  return {
-    base: fileName.slice(0, lastDot),
-    ext: fileName.slice(lastDot),
-  };
 }
 
 export function formatSpeed(bytesPerSecond: number): string {
