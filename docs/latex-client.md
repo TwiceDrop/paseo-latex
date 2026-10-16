@@ -105,7 +105,7 @@ Its Android version code exceeds the previous upstream version's revisions.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.11.3
+npm run latex:update -- --ref v0.11.4
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,
