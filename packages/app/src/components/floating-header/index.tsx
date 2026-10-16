@@ -27,9 +27,16 @@ export function FloatingHeaderLayout({ header, floating, children }: FloatingHea
   return (
     <View style={styles.root}>
       {floating ? null : header}
-      <View style={styles.content}>{children(floating ? headerHeight : 0)}</View>
+      <View collapsable={false} style={styles.content}>
+        {children(floating ? headerHeight : 0)}
+      </View>
       {floating ? (
-        <View style={styles.overlay} pointerEvents="box-none" onLayout={handleHeaderLayout}>
+        <View
+          collapsable={false}
+          style={styles.overlay}
+          pointerEvents="box-none"
+          onLayout={handleHeaderLayout}
+        >
           <FloatingHeaderFade />
           {header}
         </View>
@@ -82,12 +89,15 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     minHeight: 0,
+    // Confine pane loading overlays to this native sibling, below navigation.
+    zIndex: 0,
   },
   overlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
+    zIndex: 1,
   },
   fade: {
     position: "absolute",

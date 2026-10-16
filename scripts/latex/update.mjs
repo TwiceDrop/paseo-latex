@@ -70,6 +70,8 @@ if (!values["dry-run"]) {
     "src/mobile-panels/gestures.test.tsx",
     "src/mobile-panels/model.test.ts",
     "src/components/sidebar/sidebar-projection.test.ts",
+    "src/panels/use-agent-panel-lookup.test.tsx",
+    "src/timeline/viewed-timeline-sync.test.ts",
   ];
   run({
     command: "npm",

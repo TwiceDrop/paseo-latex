@@ -37,6 +37,19 @@ This reuses the device's existing collapsed-project preference; it sends no
 archive, remove, or lifecycle command to the host. Project filters still apply
 to the bottom section, so clear them to find a filtered-out project.
 
+## Loading and navigation
+
+The floating header and pane content have separate, non-collapsible native hosts
+with explicit stacking. Chat loading overlays stay below the header, so sidebar
+and tab controls remain reachable while history catches up. Passive initial
+loaders do not claim touches.
+
+Agent lookup only runs in a visible pane with a connection. A failed lookup
+remains on its retry view instead of immediately resubmitting. Hiding the pane,
+changing the agent/host, or disconnecting invalidates its outstanding callback;
+a late response cannot overwrite the newer view. This does not cancel shared
+transport requests needed by other consumers or restart the host.
+
 ## Personal signing
 
 Set `JAVA_HOME` to your JDK 21 directory. On this Windows machine:

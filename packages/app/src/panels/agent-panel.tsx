@@ -53,6 +53,7 @@ import {
 import { useArchiveAgent } from "@/hooks/use-archive-agent";
 import { useContainerWidthBelow } from "@/hooks/use-container-width";
 import { reconcileMissingAgentStateWithPresentAgent } from "@/panels/agent-panel-load-state";
+import { useAgentPanelLookup } from "@/panels/use-agent-panel-lookup";
 import { TimelineSyncStatus } from "@/timeline/sync-status";
 import { usePaneContext, usePaneFocus } from "@/panels/pane-context";
 import { definePanel, type PanelDescriptor } from "@/panels/panel-registry";
@@ -239,7 +240,7 @@ function renderChatAgentNonReadyView(args: {
   }
   if (viewState.tag === "boot" || !effectiveAgent) {
     return (
-      <View style={styles.container} testID="agent-loading">
+      <View style={styles.container} pointerEvents="none" testID="agent-loading">
         <View style={styles.errorContainer}>
           <ThemedLoadingSpinner size="large" uniProps={foregroundMutedColorMapping} />
         </View>
@@ -494,12 +495,6 @@ function isNotFoundErrorMessage(message: string): boolean {
   return /agent not found|not found/i.test(message);
 }
 
-type AgentLookupState =
-  | { tag: "idle" }
-  | { tag: "loading" }
-  | { tag: "not_found"; message: string }
-  | { tag: "error"; message: string };
-
 function AgentPanelContent({
   serverId,
   workspaceId,
@@ -606,65 +601,15 @@ function AgentPanelBody({
   const agentState = useSessionStore(
     useShallow((state) => selectChatAgentState(state, serverId, agentId)),
   );
-  const [lookupState, setLookupState] = useState<AgentLookupState>({ tag: "idle" });
-  const lookupAttemptTokenRef = useRef(0);
-  const retryAgentLookup = useCallback(() => setLookupState({ tag: "idle" }), []);
-
-  useEffect(() => {
-    lookupAttemptTokenRef.current += 1;
-    setLookupState({ tag: "idle" });
-  }, [agentId, serverId]);
-
-  useEffect(() => {
-    if (!agentId) {
-      return;
-    }
-    if (agentState.id) {
-      if (lookupState.tag !== "idle") {
-        setLookupState({ tag: "idle" });
-      }
-      return;
-    }
-    if (!client || !isConnected || !hasSession) {
-      return;
-    }
-    if (lookupState.tag === "loading" || lookupState.tag === "not_found") {
-      return;
-    }
-
-    setLookupState({ tag: "loading" });
-    const attemptToken = ++lookupAttemptTokenRef.current;
-
-    client
-      .fetchAgent({ agentId })
-      .then((result) => {
-        if (attemptToken !== lookupAttemptTokenRef.current) {
-          return;
-        }
-        if (!result) {
-          setLookupState({
-            tag: "not_found",
-            message: `Agent not found: ${agentId}`,
-          });
-          return;
-        }
-
-        storeFetchedAgentDetail({ serverId, result });
-        setLookupState({ tag: "idle" });
-        return;
-      })
-      .catch((error) => {
-        if (attemptToken !== lookupAttemptTokenRef.current) {
-          return;
-        }
-        const message = toErrorMessage(error);
-        if (isNotFoundErrorMessage(message)) {
-          setLookupState({ tag: "not_found", message });
-          return;
-        }
-        setLookupState({ tag: "error", message });
-      });
-  }, [agentId, agentState.id, client, hasSession, isConnected, lookupState.tag, serverId]);
+  const isPaneVisible = useRetainedPanelActive();
+  const { state: lookupState, retry: retryAgentLookup } = useAgentPanelLookup({
+    serverId,
+    agentId,
+    client,
+    enabled: isPaneVisible && isConnected && hasSession,
+    hasAgent: Boolean(agentState.id),
+    onLoaded: (result) => storeFetchedAgentDetail({ serverId, result }),
+  });
 
   if (lookupState.tag === "not_found") {
     return (
@@ -702,7 +647,7 @@ function AgentPanelBody({
 
   if (!agent) {
     return (
-      <View style={styles.container} testID="agent-loading">
+      <View style={styles.container} pointerEvents="none" testID="agent-loading">
         <View style={styles.errorContainer}>
           <ThemedLoadingSpinner size="large" uniProps={foregroundMutedColorMapping} />
         </View>
