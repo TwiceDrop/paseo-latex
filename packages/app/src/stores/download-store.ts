@@ -1,5 +1,9 @@
-import { create } from "zustand";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { Platform } from "react-native";
+import { create } from "zustand";
+import { File as FSFile, Paths } from "expo-file-system";
+import * as LegacyFileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import type { HostProfile } from "@/types/host-connection";
 import { buildDaemonWebSocketUrl } from "@/utils/daemon-endpoints";
 import { openExternalUrl } from "@/utils/open-external-url";
@@ -12,6 +16,16 @@ interface DownloadProgress {
   totalBytes: number;
   speed: number;
   eta: number;
+}
+
+// The session path holds the file in memory two to three times over (client chunks, the
+// concatenated result, then the Blob or native write). Lift once the client streams chunks to disk.
+export const MAX_SESSION_DOWNLOAD_BYTES = 64 * 1024 * 1024;
+
+export interface DownloadedBytes {
+  bytes: Uint8Array;
+  fileName: string;
+  mimeType: string | null;
 }
 
 export interface Download {
@@ -36,14 +50,20 @@ interface DownloadState {
     fileName: string;
     path: string;
     daemonProfile: HostProfile | undefined;
-    client: DaemonClient | null;
-    cwd: string;
+    client?: DaemonClient | null;
+    cwd?: string;
+    /** Connection the host runtime is using right now; `null` while disconnected. */
+    activeConnectionId: string | null;
     requestFileDownloadToken: (path: string) => Promise<{
       token: string | null;
       fileName: string | null;
       mimeType: string | null;
+      size: number | null;
       error: string | null;
     }>;
+    /** Reads the whole file over the session socket; used when no direct HTTP endpoint is active. */
+    readFile: (path: string, maxBytes: number) => Promise<{ bytes: Uint8Array; size: number }>;
+    saveFile?: typeof saveDownloadedBytes;
   }) => Promise<void>;
 
   updateProgress: (id: string, progress: DownloadProgress) => void;
@@ -67,9 +87,12 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
     fileName,
     path,
     daemonProfile,
-    requestFileDownloadToken,
+    activeConnectionId,
     client,
     cwd,
+    requestFileDownloadToken,
+    readFile,
+    saveFile = saveDownloadedBytes,
   }) => {
     const existing = [...get().downloads.values()].find(
       (download) =>
@@ -99,29 +122,13 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
     }));
 
     try {
-      if (!isWeb) {
-        if (!client || !cwd) throw new Error(i18n.t("downloads.hostUnavailable"));
-        const { downloadNativeFile } = await import("@/downloads/native-download");
-        const startedAt = Date.now();
-        let lastUpdate = 0;
-        const uri = await downloadNativeFile({
+      if (Platform.OS === "android") {
+        const uri = await downloadAndroidFile({
           client,
           cwd,
           path,
-          fileName: fileName.trim().replace(/[\\/:*?"<>|]+/g, "_") || "download",
-          onProgress: (bytesWritten, totalBytes) => {
-            const now = Date.now();
-            if (now - lastUpdate < 100 && bytesWritten !== totalBytes) return;
-            lastUpdate = now;
-            const speed = bytesWritten / Math.max((now - startedAt) / 1000, 0.001);
-            get().updateProgress(id, {
-              percent: totalBytes ? bytesWritten / totalBytes : 0,
-              bytesWritten,
-              totalBytes,
-              speed,
-              eta: speed ? (totalBytes - bytesWritten) / speed : 0,
-            });
-          },
+          fileName,
+          onProgress: (progress) => get().updateProgress(id, progress),
           onSaving: () =>
             set((state) => ({
               downloads: new Map(state.downloads).set(id, {
@@ -141,24 +148,96 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
         return;
       }
       const tokenResponse = await requestFileDownloadToken(path);
-      if (tokenResponse.error || !tokenResponse.token) {
-        throw new Error(tokenResponse.error ?? i18n.t("downloads.requestTokenFailed"));
-      }
+      const token = requireDownloadToken(tokenResponse);
 
-      const downloadTarget = resolveDaemonDownloadTarget(daemonProfile);
+      const resolvedFileName = tokenResponse.fileName ?? fileName;
+      const downloadTarget = resolveDaemonDownloadTarget(daemonProfile, activeConnectionId);
+      if (!downloadTarget) {
+        // Relay, SSH, socket and pipe hosts have no HTTP endpoint: read the file over the
+        // session socket that is already connected (#543).
+        if (
+          typeof tokenResponse.size === "number" &&
+          tokenResponse.size > MAX_SESSION_DOWNLOAD_BYTES
+        ) {
+          throw new Error(
+            i18n.t("composer.errors.fileTooLarge", { fileName: resolvedFileName, size: "64 MB" }),
+          );
+        }
+        const { bytes, size } = await readFile(path, MAX_SESSION_DOWNLOAD_BYTES);
+        // A daemon without a binary channel answers `encoding: "none"` for a binary file: no
+        // content, real size. Never save that as a complete download.
+        if (bytes.byteLength !== size) {
+          throw new Error(
+            `File transfer incomplete: expected ${size} bytes, received ${bytes.byteLength}.`,
+          );
+        }
+        const savedUri = await saveFile({
+          bytes,
+          fileName: resolvedFileName,
+          mimeType: tokenResponse.mimeType,
+        });
+        get().completeDownload(id);
+        if (savedUri !== null) {
+          await shareSavedFile(savedUri, tokenResponse.mimeType, resolvedFileName);
+        }
+        return;
+      }
       if (!downloadTarget.baseUrl) {
         throw new Error(i18n.t("downloads.hostUnavailable"));
       }
 
-      const resolvedFileName = tokenResponse.fileName ?? fileName;
       const downloadUrl = buildDownloadUrl(
         downloadTarget.baseUrl,
-        tokenResponse.token,
+        token,
         isWeb ? downloadTarget.authCredentials : null,
       );
 
-      triggerBrowserDownload(downloadUrl, resolvedFileName);
+      if (isWeb) {
+        triggerBrowserDownload(downloadUrl, resolvedFileName);
+        get().completeDownload(id);
+        return;
+      }
+
+      const downloadStartTime = Date.now();
+      const targetFile = resolveDownloadTargetFile(resolvedFileName);
+      const downloadResumable = LegacyFileSystem.createDownloadResumable(
+        downloadUrl,
+        targetFile.uri,
+        downloadTarget.authHeader
+          ? { headers: { Authorization: downloadTarget.authHeader } }
+          : undefined,
+        (data) => {
+          const now = Date.now();
+          const { totalBytesWritten, totalBytesExpectedToWrite } = data;
+
+          if (totalBytesExpectedToWrite <= 0) {
+            return;
+          }
+
+          const percent = totalBytesWritten / totalBytesExpectedToWrite;
+          const elapsed = (now - downloadStartTime) / 1000;
+          const speed = elapsed > 0 ? totalBytesWritten / elapsed : 0;
+          const remaining = totalBytesExpectedToWrite - totalBytesWritten;
+          const eta = speed > 0 ? remaining / speed : 0;
+
+          get().updateProgress(id, {
+            percent,
+            bytesWritten: totalBytesWritten,
+            totalBytes: totalBytesExpectedToWrite,
+            speed,
+            eta,
+          });
+        },
+      );
+
+      const result = await downloadResumable.downloadAsync();
+      if (!result) {
+        throw new Error(i18n.t("downloads.cancelled"));
+      }
+
       get().completeDownload(id);
+
+      await shareSavedFile(result.uri, tokenResponse.mimeType, resolvedFileName);
     } catch (error) {
       const message = error instanceof Error ? error.message : i18n.t("downloads.failed");
       if (isWeb) {
@@ -173,7 +252,7 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
   updateProgress: (id, progress) => {
     set((state) => {
       const download = state.downloads.get(id);
-      if (!download || download.status !== "downloading") {
+      if (!download || (download.status !== "downloading" && download.status !== "saving")) {
         return state;
       }
       const updated = new Map(state.downloads);
@@ -220,7 +299,7 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
     set((state) => {
       const updated = new Map(state.downloads);
       for (const [id, download] of updated) {
-        if (download.status !== "downloading" && download.status !== "saving") {
+        if (download.status !== "downloading") {
           updated.delete(id);
         }
       }
@@ -249,10 +328,66 @@ interface DownloadTarget {
   authCredentials: { username: string; password: string } | null;
 }
 
-function resolveDaemonDownloadTarget(daemon?: HostProfile): DownloadTarget {
-  const connection = daemon?.connections.find((conn) => conn.type === "directTcp") ?? null;
-  if (!connection) {
-    return { baseUrl: null, authHeader: null, authCredentials: null };
+function requireDownloadToken(response: { token: string | null; error: string | null }): string {
+  if (response.error || !response.token) {
+    throw new Error(response.error ?? i18n.t("downloads.requestTokenFailed"));
+  }
+  return response.token;
+}
+
+async function downloadAndroidFile({
+  client,
+  cwd,
+  path,
+  fileName,
+  onProgress,
+  onSaving,
+}: {
+  client?: DaemonClient | null;
+  cwd?: string;
+  path: string;
+  fileName: string;
+  onProgress: (progress: DownloadProgress) => void;
+  onSaving: () => void;
+}): Promise<string | null> {
+  if (!client || !cwd) throw new Error(i18n.t("downloads.hostUnavailable"));
+  const { downloadNativeFile } = await import("@/downloads/native-download");
+  const startedAt = Date.now();
+  let lastUpdate = 0;
+  return downloadNativeFile({
+    client,
+    cwd,
+    path,
+    fileName: fileName.trim().replace(/[\\/:*?"<>|]+/g, "_") || "download",
+    onSaving,
+    onProgress: (bytesWritten, totalBytes) => {
+      const now = Date.now();
+      if (now - lastUpdate < 100 && bytesWritten !== totalBytes) return;
+      lastUpdate = now;
+      const speed = bytesWritten / Math.max((now - startedAt) / 1000, 0.001);
+      onProgress({
+        percent: totalBytes ? bytesWritten / totalBytes : 0,
+        bytesWritten,
+        totalBytes,
+        speed,
+        eta: speed ? (totalBytes - bytesWritten) / speed : 0,
+      });
+    },
+  });
+}
+
+/**
+ * The HTTP download route is only reachable over a direct TCP connection. Returns `null` when
+ * the connection in use is anything else (relay, SSH, socket, pipe, or none yet), so the caller
+ * reads the file over the session socket instead.
+ */
+function resolveDaemonDownloadTarget(
+  daemon: HostProfile | undefined,
+  activeConnectionId: string | null,
+): DownloadTarget | null {
+  const connection = daemon?.connections.find((conn) => conn.id === activeConnectionId);
+  if (connection?.type !== "directTcp") {
+    return null;
   }
 
   let parsed: URL;
@@ -304,6 +439,47 @@ function buildDownloadUrl(
   return url.toString();
 }
 
+/**
+ * Saves bytes read over the session. Web and Electron hand them to the browser's download
+ * manager and return `null`; native writes the file and returns its URI for the share sheet.
+ */
+async function saveDownloadedBytes({
+  bytes,
+  fileName,
+  mimeType,
+}: DownloadedBytes): Promise<string | null> {
+  if (isWeb) {
+    const buffer = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(buffer).set(bytes);
+    const url = URL.createObjectURL(
+      new Blob([buffer], { type: mimeType ?? "application/octet-stream" }),
+    );
+    triggerBrowserDownload(url, fileName);
+    // The browser may still be reading the blob while its save prompt is open.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return null;
+  }
+  // Resolve and write in one tick so two downloads of the same name cannot pick the same path.
+  const targetFile = resolveDownloadTargetFile(fileName);
+  targetFile.write(bytes);
+  return targetFile.uri;
+}
+
+async function shareSavedFile(
+  uri: string,
+  mimeType: string | null,
+  fileName: string,
+): Promise<void> {
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, {
+      mimeType: mimeType ?? undefined,
+      dialogTitle: fileName
+        ? i18n.t("downloads.shareFileNamed", { fileName })
+        : i18n.t("downloads.shareFile"),
+    });
+  }
+}
+
 function triggerBrowserDownload(url: string, fileName: string) {
   if (typeof document === "undefined") {
     if (typeof window !== "undefined") {
@@ -319,6 +495,44 @@ function triggerBrowserDownload(url: string, fileName: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+function resolveDownloadTargetFile(fileName: string): FSFile {
+  const directory = Paths.cache ?? Paths.document;
+  if (!directory) {
+    throw new Error("No download directory available.");
+  }
+
+  const safeName = sanitizeDownloadFileName(fileName);
+  const split = splitFileName(safeName);
+  let targetFile = new FSFile(directory, safeName);
+  let suffix = 1;
+
+  while (targetFile.exists) {
+    targetFile = new FSFile(directory, `${split.base} (${suffix})${split.ext}`);
+    suffix += 1;
+  }
+
+  return targetFile;
+}
+
+function sanitizeDownloadFileName(fileName: string): string {
+  const trimmed = fileName.trim();
+  if (!trimmed) {
+    return "download";
+  }
+  return trimmed.replace(/[\\/:*?"<>|]+/g, "_");
+}
+
+function splitFileName(fileName: string): { base: string; ext: string } {
+  const lastDot = fileName.lastIndexOf(".");
+  if (lastDot <= 0) {
+    return { base: fileName, ext: "" };
+  }
+  return {
+    base: fileName.slice(0, lastDot),
+    ext: fileName.slice(lastDot),
+  };
 }
 
 export function formatSpeed(bytesPerSecond: number): string {

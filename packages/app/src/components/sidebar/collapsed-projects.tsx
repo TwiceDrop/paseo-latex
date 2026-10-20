@@ -11,7 +11,7 @@ import {
   useSidebarProjectStatusBucket,
   type SidebarProjectEntry,
 } from "@/hooks/use-sidebar-workspaces-list";
-import { density, densityFontSize } from "@/styles/density";
+import { density } from "@/styles/density";
 
 interface CollapsedProjectsProps {
   projects: readonly SidebarProjectEntry[];
@@ -100,7 +100,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   heading: {
     color: theme.colors.foregroundMuted,
-    fontSize: densityFontSize(theme, "sm"),
+    fontSize: theme.fontSize.sm,
     paddingHorizontal: theme.spacing[2],
     paddingBottom: theme.spacing[1],
   },
@@ -118,6 +118,6 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     minWidth: 0,
     color: theme.colors.foregroundMuted,
-    fontSize: densityFontSize(theme, "base"),
+    fontSize: theme.fontSize.base,
   },
 }));

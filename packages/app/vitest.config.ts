@@ -79,9 +79,25 @@ export default defineConfig({
   // so it scans the native files and dies on imports react-native-web has no answer for.
   // Unbundled, the same imports go through the resolver below and land on the web files.
   optimizeDeps: {
+    esbuildOptions: {
+      plugins: [
+        {
+          name: "enriched-markdown-wasm-export",
+          setup(build) {
+            // This Emscripten CommonJS file lives in a type:module package. Metro
+            // handles it; esbuild needs the factory's equivalent ESM export.
+            build.onLoad({ filter: /[/\\]web[/\\]wasm[/\\]md4c\.js$/ }, ({ path: file }) => ({
+              contents: `${fs.readFileSync(file, "utf8")}\nexport default createMd4cModule;`,
+              loader: "js",
+            }));
+          },
+        },
+      ],
+    },
     // Bundle the CJS dependencies of the excluded gesture-handler package for the browser.
     include: [
       "react/jsx-runtime",
+      "react-native-enriched-markdown",
       "react-native-markdown-display/src/lib/util/tokensToAST",
       "react-native-gesture-handler > hoist-non-react-statics",
       "react-native-gesture-handler > invariant",
@@ -116,6 +132,15 @@ export default defineConfig({
       ".json",
     ],
     alias: [
+      // Prebundle the web entry so its CommonJS WASM factory and optional KaTeX
+      // loader are transformed, matching Metro's web platform resolution.
+      {
+        find: /^react-native-enriched-markdown$/,
+        replacement: path.resolve(
+          resolvePackageEntry("react-native-enriched-markdown"),
+          "lib/module/index.web.js",
+        ),
+      },
       {
         find: /^@getpaseo\/relay\/e2ee$/,
         replacement: path.resolve(__dirname, "../relay/src/e2ee.ts"),

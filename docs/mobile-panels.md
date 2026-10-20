@@ -77,9 +77,10 @@ at zero after this travel threshold; it does not jump by a quarter screen. Read
 travel from touch-down coordinates because native Pan resets its translation
 when manual activation succeeds. Closing pans retain their shorter threshold.
 
-Android math WebViews use a native content gesture that blocks the two opening
-pans while leaving parent vertical scrolling interruptible. Long formulas can
-scroll horizontally, and vertical drags over formulas scroll the chat.
+Android chat math uses the enriched Markdown engine's native horizontal blocks.
+Overflowing formulas own horizontal drags, while vertical drags must scroll the
+chat. Legacy isolated math WebViews retain their native gesture blocker for the
+two opening pans and allow parent vertical scrolling.
 
 Re-running the begin gate after activation self-cancels the gesture because an active gesture is, by
 definition, no longer eligible to begin.

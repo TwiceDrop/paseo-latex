@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import type { TextStyle } from "react-native";
 import type { ASTNode, RenderRules } from "react-native-markdown-display";
-import { MarkdownTextSpan } from "@/components/markdown-text";
-import type { MarkdownStyles } from "../renderer";
+import { Text as MarkdownTextSpan } from "react-native";
+import type { MarkdownStyles } from "./group";
 import { MarkdownMath } from ".";
 
 export const mathMarkdownRules: RenderRules = {

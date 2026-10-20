@@ -3,7 +3,7 @@ import { View, useWindowDimensions, StyleSheet } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { GestureDetector } from "react-native-gesture-handler";
 import { useMobilePanelContentGesture } from "@/mobile-panels/gestures";
-import { MarkdownTextSpan } from "@/components/markdown-text";
+import { Text as MarkdownTextSpan } from "react-native";
 import { createMathDocument, parseMathDimensions, type MathDimensions } from "./document";
 import { renderMath } from "./render";
 import type { MarkdownMathProps } from "./types";

@@ -29,6 +29,19 @@ buffering a whole APK through `readFile()` duplicates large byte arrays in memor
 The Android document picker lives in `modules/paseo-file-download`; using
 `ACTION_CREATE_DOCUMENT` permits saving to Downloads without broad storage access.
 
+## Markdown engine updates
+
+From 0.12, chat uses Enriched Markdown's native math renderer on Android and
+KaTeX MathML on the web. Enable both the package's `enriched-markdown.enableMath`
+build setting and the renderer's `latexMath` flag. Keep TeX opaque while adapting
+HTML, images and file links, and keep a multiline formula inside one streaming
+text view. Otherwise an engine update can silently alter TeX or split its delimiters.
+
+The Android build restores the pinned code-highlighting grammar sources after
+an install with `--ignore-scripts`; it does not download iOS frameworks.
+The vendor patch applies the engine's horizontal-block gesture handling to math
+as well as code and tables, so formula drags do not accidentally open sidebars.
+
 ## Collapsed sidebar projects
 
 Press a project heading to move the whole group into **Collapsed projects** above
@@ -80,6 +93,10 @@ the repository root:
 npm run android:latex
 ```
 
+On Windows, the signing plugin places CMake's staging files in `.dev/cxx` and
+limits object paths to 240 characters. This keeps the new renderer's generated
+C++ paths within Ninja's Windows path limit even in this nested checkout.
+
 For a phone-only ARM64 build:
 
 ```powershell
@@ -118,7 +135,7 @@ Its Android version code exceeds the previous upstream version's revisions.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.11.4
+npm run latex:update -- --ref v0.12.0
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,
@@ -136,7 +153,7 @@ npm run latex:update -- --ref upstream/main --dry-run
 After an update, run the existing browser checks and build a test APK:
 
 ```powershell
-npm run test:browser --workspace=@getpaseo/app -- src/components/markdown/math/math.browser.test.tsx src/components/markdown/math/text-group.browser.test.ts src/assistant-selection-copy/content.browser.test.ts --bail=1
+npm run test:browser --workspace=@getpaseo/app -- src/components/markdown/math/enriched.browser.test.tsx src/components/floating-header/index.browser.test.tsx src/assistant-selection-copy/content.browser.test.ts --bail=1
 npm run android:latex -- --arch arm64-v8a
 ```
 

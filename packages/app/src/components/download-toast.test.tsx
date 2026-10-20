@@ -38,6 +38,10 @@ const { nativeDownload, theme, translate } = vi.hoisted(() => ({
 }));
 vi.mock("@/downloads/native-download", () => ({ downloadNativeFile: nativeDownload }));
 vi.mock("@/constants/platform", () => ({ isWeb: false }));
+vi.mock("react-native", async (load) => {
+  const actual = await load<typeof import("react-native")>();
+  return { ...actual, Platform: { ...actual.Platform, OS: "android" } };
+});
 vi.mock("@/i18n/i18next", () => ({ i18n: { t: translate } }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: translate }) }));
 vi.mock("react-native-unistyles", () => ({
@@ -65,6 +69,8 @@ const input = {
   daemonProfile: undefined,
   client: {} as DaemonClient,
   requestFileDownloadToken: requestToken,
+  activeConnectionId: null,
+  readFile: vi.fn(),
 };
 beforeEach(() => {
   dom = new JSDOM("<html><body><div id='root'></div></body></html>", { url: "http://localhost" });

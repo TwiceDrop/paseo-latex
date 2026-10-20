@@ -49,6 +49,12 @@ function run({ command, args, cwd }) {
 }
 
 run({
+  command: process.execPath,
+  args: [path.join(repoRoot, "scripts/latex/prepare-enriched-android.mjs")],
+  cwd: repoRoot,
+});
+
+run({
   command: "npm",
   args: ["run", "build:math-assets", "--workspace=@getpaseo/app"],
   cwd: repoRoot,

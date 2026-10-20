@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import type { TextStyle } from "react-native";
+import type { TextStyle, ViewStyle } from "react-native";
 import type { ASTNode } from "react-native-markdown-display";
-import type { MarkdownStyles } from "../renderer";
+export type MarkdownStyles = Record<string, TextStyle & ViewStyle & { [key: string]: unknown }>;
 
 export interface MathTextGroupProps {
   node: ASTNode;

@@ -1,5 +1,5 @@
 import { memo, useMemo } from "react";
-import { MarkdownTextSpan } from "@/components/markdown-text";
+import { Text as MarkdownTextSpan } from "react-native";
 import { renderMath } from "./render";
 import type { MarkdownMathProps } from "./types";
 import "./katex.gen.css";

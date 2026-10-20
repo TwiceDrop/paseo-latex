@@ -20,6 +20,20 @@ if (System.getProperty('os.name').toLowerCase().contains('windows')) {
     react {
         extraPackagerArgs.addAll(['--entry-file', entryFile.get().asFile.absolutePath])
     }
+    android {
+        externalNativeBuild {
+            cmake {
+                buildStagingDirectory rootProject.file('../../../.dev/cxx')
+            }
+        }
+        defaultConfig {
+            externalNativeBuild {
+                cmake {
+                    arguments '-DCMAKE_OBJECT_PATH_MAX=240'
+                }
+            }
+        }
+    }
 }
 if ((findProperty('paseoLatexLowMemoryBuild') ?: 'false').toBoolean()) {
     react {
