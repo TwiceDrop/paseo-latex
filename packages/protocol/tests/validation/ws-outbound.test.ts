@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -18,6 +18,19 @@ const generatedWSOutboundPath = resolve(
   "src/generated/validation/ws-outbound.aot.ts",
 );
 const require = createRequire(import.meta.url);
+
+async function readGeneratedModules(): Promise<string[]> {
+  const directory = dirname(generatedWSOutboundPath);
+  const files = (await readdir(directory)).filter((name) =>
+    /^ws-outbound(?:\.part-\d+)?\.aot\.ts$/.test(name),
+  );
+  return Promise.all(files.map((name) => readFile(join(directory, name), "utf8")));
+}
+
+function generatedFunctionSizes(generated: string): number[] {
+  const starts = [...generated.matchAll(/function safeParse_\w+\(/g)].map((match) => match.index);
+  return starts.map((start, index) => (starts[index + 1] ?? generated.length) - start);
+}
 
 async function compileInlineSchema(sourceSchema: string): Promise<GeneratedSchema> {
   const scratchRoot = resolve(protocolRoot, "../../.tmp");
@@ -261,7 +274,7 @@ const SourceSchema = z.object({
   });
 
   it("emits runtime imports with .js extensions", async () => {
-    const generated = await readFile(generatedWSOutboundPath, "utf8");
+    const generated = (await readGeneratedModules()).join("\n");
     expect(generated).toContain('from "./ws-outbound-schema-metadata.js"');
   });
 
@@ -321,9 +334,7 @@ const SourceSchema = z.object({
 
   it("keeps each generated validator function small", async () => {
     // A single function for the whole protocol made V8's Maglev tier spend ~800 MB and seconds compiling it.
-    const generated = await readFile(generatedWSOutboundPath, "utf8");
-    const starts = [...generated.matchAll(/function safeParse_\w+\(/g)].map((match) => match.index);
-    const sizes = starts.map((start, index) => (starts[index + 1] ?? generated.length) - start);
+    const sizes = (await readGeneratedModules()).flatMap(generatedFunctionSizes);
 
     expect(Math.max(...sizes)).toBeLessThan(1_000_000);
     expect(sizes.length).toBeGreaterThan(1);

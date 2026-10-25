@@ -10,6 +10,13 @@ The reason is mobile performance. A captured 353 KB provider snapshot cost about
 
 Keep one generated function per message type. zod-aot inlines every nested schema into the function it compiles, so compiling `WSOutboundMessageSchema` as a whole produced one 11 MB function. On V8 (daemon clients, plugin hosts, the CLI, and Electron), the Maglev tier compiled that function once it was hot, allocating about 800 MB and stalling for seconds, and compiled it again after each deoptimization. Hermes has no JIT, so mobile never showed it. `packages/protocol/tests/validation/ws-outbound.test.ts` fails if a generated function grows past 1 MB.
 
+Keep the generated functions in bounded modules too. A single module compiled to
+about 10 MB of JavaScript and exceeded this workstation's build memory budget in
+Metro. The generator groups validators around 256 KB of source, allowing a larger
+individual validator, and leaves the public exports in an index. The generated
+module regression test caps every module at 1 MB. This split changes packaging,
+not schemas or validation behavior.
+
 Generated validators preserve unknown keys where Zod object parsing strips them. The client dispatch path uses known `type` and payload fields, so this passthrough behavior is accepted for inbound messages. The wire format is unchanged.
 
 Provider model normalization is a parser-side compatibility shim in the client consumers that need it. Newer daemons normalize at the provider registry source.

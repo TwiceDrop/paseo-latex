@@ -39,6 +39,10 @@ one page at a time with zoom controls. TXT, LOG and configuration text recognize
 UTF-8, UTF-16 BOMs and GB18030. Existing code, Markdown, HTML and image views
 keep their own renderers.
 
+From 0.13, document previews participate in the file panel **Open with** selector.
+Plugin file panels remain selectable. The file tab's download action is available
+even when a file has no preview or a plugin supplies its panel.
+
 The document viewer reads at most 32 MB over the existing authenticated session.
 It runs in an isolated iframe or native WebView with its parsers, PDF CMaps and
 standard fonts bundled locally. It does not upload documents to an Office service.
@@ -195,6 +199,12 @@ and two CPUs. Normal builds keep the upstream compiler. Do not run emulators or
 heavy tests alongside packaging. Windows signing requires a separate code-signing
 certificate; the personal Android keystore cannot sign this installer.
 
+The personal installer backports electron-builder's bounded UserProgramFiles path
+copy through a versioned vendor patch. Keep that patch while the pinned
+builder has the legacy fixed-width read: both 0.12 and 0.13 installers reproduced
+an intermittent `System.dll` access violation on this Windows machine. It must
+preserve existing install locations and the user's explicit directory selection.
+
 After an interrupted renderer/package step, `-- --resume` reuses the already-built
 dependencies. Only use it while those source files are unchanged.
 For a desktop-wrapper-only change, `-- --package-only` also reuses the exported
@@ -205,7 +215,7 @@ renderer. Rebuild the renderer whenever app source changes.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.12.0
+npm run latex:update -- --ref v0.13.0
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,

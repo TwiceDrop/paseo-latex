@@ -29,6 +29,8 @@ const kinds: Record<string, DocumentKind> = {
   ppt: "legacy",
 };
 
+export const documentPreviewExtensions = Object.keys(kinds);
+
 export function documentPreviewKind(path: string): DocumentKind | null {
   const name = path.trim().split(/[\\/]/).pop() ?? "";
   const dot = name.lastIndexOf(".");

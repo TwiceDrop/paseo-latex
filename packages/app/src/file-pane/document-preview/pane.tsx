@@ -8,12 +8,8 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useAppActivelyVisible } from "@/hooks/use-app-visible";
-import { useFileDownload } from "@/hooks/use-file-download";
 import { useSessionStore } from "@/stores/session-store";
-import { useDownloadStore } from "@/stores/download-store";
 import { resolveFilePreviewReadTarget } from "@/file-explorer/preview-target";
-import { getFileNameFromPath } from "@/attachments/utils";
-import { FilePanelBar } from "../bar";
 import { documentPreviewHtml } from "./html";
 import { readPreviewDocument, type DocumentKind } from "./model";
 import { DocumentSurface } from "./surface";
@@ -56,19 +52,6 @@ export function DocumentPane({
     retry: false,
     gcTime: 0,
   });
-  const download = useFileDownload({ serverId, workspaceRoot: target?.cwd ?? "" });
-  const downloading = useDownloadStore((state) =>
-    [...state.downloads.values()].some(
-      (file) =>
-        file.serverId === serverId &&
-        file.scopeId === target?.cwd &&
-        file.path === target?.path &&
-        (file.status === "downloading" || file.status === "saving"),
-    ),
-  );
-  const onDownload = useCallback(() => {
-    if (target) download({ path: target.path, fileName: getFileNameFromPath(path) ?? path });
-  }, [download, path, target]);
   const retry = useCallback(() => {
     void query.refetch();
   }, [query]);
@@ -122,12 +105,7 @@ export function DocumentPane({
       </View>
     );
   return (
-    <View style={styles.container} testID="workspace-file-pane">
-      <FilePanelBar
-        size={query.data?.byteLength}
-        onDownload={onDownload}
-        downloading={downloading}
-      />
+    <View style={styles.container} testID="document-preview-pane">
       {content}
     </View>
   );

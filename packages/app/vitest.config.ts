@@ -2,6 +2,8 @@ import { defineConfig, configDefaults } from "vitest/config";
 import { playwright } from "@vitest/browser-playwright";
 import path from "path";
 import fs from "fs";
+import { transformSync } from "@babel/core";
+import { build } from "esbuild";
 
 // Set this before Vite resolves dependencies and Vitest starts its workers.
 Object.assign(process.env, { NODE_ENV: "test" });
@@ -16,6 +18,43 @@ const resolvePackageEntry = (packageName: string) => {
 };
 
 export default defineConfig({
+  plugins: [
+    {
+      name: "compile-usage-components",
+      enforce: "pre",
+      transform(source, id) {
+        // These labels must react to time and language in the compiled app too.
+        if (!id.includes("/src/usage/") || !id.endsWith(".tsx") || id.includes(".test.")) return;
+        const result = transformSync(source, {
+          filename: id,
+          babelrc: false,
+          configFile: false,
+          parserOpts: { plugins: ["typescript", "jsx"] },
+          plugins: [["babel-plugin-react-compiler", { target: "19" }]],
+          sourceMaps: true,
+        });
+        if (result?.code) return { code: result.code, map: result.map };
+      },
+    },
+    {
+      name: "bundle-i18n-resources",
+      // Metro resolves literal requires lazily. Vite's TS transform leaves them
+      // to Node, which cannot resolve the resource modules. Bundle this boundary
+      // so unit and browser consumers exercise the same deferred module loading.
+      async transform(_source, id) {
+        if (path.resolve(id) !== path.resolve(__dirname, "src/i18n/i18next.ts")) return;
+        const result = await build({
+          entryPoints: [id],
+          bundle: true,
+          format: "esm",
+          platform: "neutral",
+          external: ["i18next", "react-i18next"],
+          write: false,
+        });
+        return { code: result.outputFiles[0].text, map: null };
+      },
+    },
+  ],
   test: {
     environment: "node",
     exclude: [...configDefaults.exclude, "e2e/**"],
@@ -65,9 +104,12 @@ export default defineConfig({
       deps: {
         fallbackCJS: true,
         inline: [
+          "react-native-enriched-markdown",
           "zustand",
           "@tanstack/react-query",
           "react-native-web",
+          "react-native-reanimated",
+          "react-native-worklets",
           "react-native-gesture-handler",
           "react-native-keyboard-controller",
         ],
@@ -79,19 +121,32 @@ export default defineConfig({
   // so it scans the native files and dies on imports react-native-web has no answer for.
   // Unbundled, the same imports go through the resolver below and land on the web files.
   optimizeDeps: {
+    // Expo's public navigation barrel also loads screens. Match Metro's web-first resolution
+    // while optimizing its CJS dependencies, including DebugContainer.web.js.
     esbuildOptions: {
       plugins: [
         {
           name: "enriched-markdown-wasm-export",
-          setup(build) {
+          setup(bundler) {
             // This Emscripten CommonJS file lives in a type:module package. Metro
             // handles it; esbuild needs the factory's equivalent ESM export.
-            build.onLoad({ filter: /[/\\]web[/\\]wasm[/\\]md4c\.js$/ }, ({ path: file }) => ({
+            bundler.onLoad({ filter: /[/\\]web[/\\]wasm[/\\]md4c\.js$/ }, ({ path: file }) => ({
               contents: `${fs.readFileSync(file, "utf8")}\nexport default createMd4cModule;`,
               loader: "js",
             }));
           },
         },
+      ],
+      resolveExtensions: [
+        ".web.js",
+        ".web.jsx",
+        ".web.ts",
+        ".web.tsx",
+        ".js",
+        ".jsx",
+        ".ts",
+        ".tsx",
+        ".json",
       ],
     },
     // Bundle the CJS dependencies of the excluded gesture-handler package for the browser.
@@ -99,6 +154,14 @@ export default defineConfig({
       "react/jsx-runtime",
       "react-native-enriched-markdown",
       "react-native-markdown-display/src/lib/util/tokensToAST",
+      "react/compiler-runtime",
+      "expo-router/react-navigation",
+      "@testing-library/react",
+      "@tanstack/react-query",
+      "react-i18next",
+      "i18next",
+      "@marijn/find-cluster-break",
+      "tiny-invariant",
       "react-native-gesture-handler > hoist-non-react-statics",
       "react-native-gesture-handler > invariant",
     ],
@@ -132,15 +195,6 @@ export default defineConfig({
       ".json",
     ],
     alias: [
-      // Prebundle the web entry so its CommonJS WASM factory and optional KaTeX
-      // loader are transformed, matching Metro's web platform resolution.
-      {
-        find: /^react-native-enriched-markdown$/,
-        replacement: path.resolve(
-          resolvePackageEntry("react-native-enriched-markdown"),
-          "lib/module/index.web.js",
-        ),
-      },
       {
         find: /^@getpaseo\/relay\/e2ee$/,
         replacement: path.resolve(__dirname, "../relay/src/e2ee.ts"),
