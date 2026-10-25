@@ -1,7 +1,7 @@
 import { getSlides, loadPresentation } from "@office-kit/pptx";
 import { renderSlideToSvg } from "@office-kit/pptx-preview";
 import type { DocumentLabels } from "../messages";
-import { button, element } from "./controls";
+import { button, element, observeContentWidth } from "./controls";
 
 export async function renderSlides(
   bytes: Uint8Array,
@@ -14,6 +14,7 @@ export async function renderSlides(
   if (slides.length === 0) throw new Error("No slides");
   let index = 0;
   let zoom = 1;
+  let rendered: Element | null = null;
   const status = element("span");
   const previous = button(labels.previous, () => {
     index--;
@@ -29,17 +30,23 @@ export async function renderSlides(
     next,
     button(labels.zoomOut, () => {
       zoom = Math.max(0.5, zoom - 0.25);
-      show();
+      fit();
     }),
     button(labels.zoomIn, () => {
       zoom = Math.min(3, zoom + 0.25);
-      show();
+      fit();
     }),
     button(labels.fit, () => {
       zoom = 1;
-      show();
+      fit();
     }),
   );
+  function fit(): void {
+    if (root.clientWidth <= 24) return;
+    // Scaling the existing SVG preserves its content and avoids parsing the slide
+    // again for every zoom click or sidebar/viewport size change.
+    rendered?.setAttribute("width", `${(root.clientWidth - 24) * zoom}`);
+  }
   function show(): void {
     const markup = renderSlideToSvg(presentation, slides[index]);
     const parsed = new DOMParser().parseFromString(markup, "image/svg+xml");
@@ -55,12 +62,15 @@ export async function renderSlides(
         if (attribute.name.startsWith("on") || external) node.removeAttribute(attribute.name);
       }
     });
-    svg.setAttribute("width", `${Math.max(240, root.clientWidth - 24) * zoom}`);
     svg.removeAttribute("height");
-    root.replaceChildren(document.importNode(svg, true));
+    rendered = document.importNode(svg, true);
+    root.replaceChildren(rendered);
+    fit();
+    root.scrollTo(0, 0);
     previous.disabled = index === 0;
     next.disabled = index + 1 === slides.length;
     status.textContent = `${index + 1} / ${slides.length}`;
   }
   show();
+  observeContentWidth(root, fit);
 }

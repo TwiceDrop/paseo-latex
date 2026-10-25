@@ -11,7 +11,7 @@ import { useAppActivelyVisible } from "@/hooks/use-app-visible";
 import { useSessionStore } from "@/stores/session-store";
 import { resolveFilePreviewReadTarget } from "@/file-explorer/preview-target";
 import { documentPreviewHtml } from "./html";
-import { readPreviewDocument, type DocumentKind } from "./model";
+import { readPreviewDocument, shareDocumentBytes, type DocumentKind } from "./model";
 import { DocumentSurface } from "./surface";
 
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
@@ -49,6 +49,8 @@ export function DocumentPane({
     // Switching retained workspaces should not repeatedly transfer and base64-encode
     // the same document. Reopening the pane still revalidates through useFetchQuery.
     staleTimeMs: 30_000,
+    // A fresh read of identical bytes should not rebuild the large viewer HTML.
+    structuralSharing: shareDocumentBytes,
     retry: false,
     gcTime: 0,
   });

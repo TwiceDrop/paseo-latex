@@ -48,6 +48,17 @@ export interface DocumentReader {
   ): Promise<FileReadResult>;
 }
 
+/** Query's default structural sharing only handles JSON, not transferred byte arrays. */
+export function shareDocumentBytes(previous: unknown, next: unknown): unknown {
+  if (previous === next) return previous;
+  if (!(previous instanceof Uint8Array) || !(next instanceof Uint8Array)) return next;
+  if (previous.byteLength !== next.byteLength) return next;
+  for (let index = 0; index < next.byteLength; index++) {
+    if (previous[index] !== next[index]) return next;
+  }
+  return previous;
+}
+
 export async function readPreviewDocument(input: {
   reader: DocumentReader;
   cwd: string;

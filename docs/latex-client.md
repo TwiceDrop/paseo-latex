@@ -53,12 +53,18 @@ differ from the desktop applications.
 
 Retained document panes reuse the fetched bytes for 30 seconds during rapid tab
 or workspace switches. Reopening a pane revalidates immediately; returning after
-30 seconds also revalidates. Hidden panes do not initiate reads. Native workspace
+30 seconds also revalidates. An unchanged response retains the existing byte array,
+so revalidation does not rebuild the viewer HTML. Hidden panes do not initiate reads. Native workspace
 retention remains limited to one workspace to bound memory and preserve Fabric
 ownership. PDF backing canvases are capped at 4,194,304 pixels and 8,192 pixels per
 side (about 16 MiB of RGBA storage); CSS zoom remains available, with reduced
 raster resolution on very large pages. Binary decoding writes directly into a
 typed array instead of allocating a temporary array for every character.
+
+PDF and slide previews refit after pane width changes, including returning from a
+hidden workspace, while preserving the selected page and zoom. Slide zoom reuses
+the rendered SVG. PDF resizing waits for the active render to finish before using
+the same canvas again.
 
 After changing the viewer runtime or parser dependencies, run
 `npm run build:document-preview --workspace=@getpaseo/app`. The generated viewer

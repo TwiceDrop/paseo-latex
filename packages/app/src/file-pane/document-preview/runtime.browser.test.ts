@@ -2,6 +2,14 @@ import { afterEach, expect, it } from "vitest";
 import { documentPreviewHtml } from "./html";
 import type { DocumentKind } from "./model";
 import type { DocumentLabels } from "./messages";
+import {
+  addSlide,
+  addSlideTextBox,
+  createPresentation,
+  getSlideLayouts,
+  inches,
+  savePresentation,
+} from "@office-kit/pptx";
 
 const labels: DocumentLabels = {
   loading: "Loading",
@@ -21,7 +29,7 @@ afterEach(() => {
   frame?.remove();
 });
 
-async function preview(kind: DocumentKind, source: string) {
+async function preview(kind: DocumentKind, source: string | Uint8Array) {
   frame = document.createElement("iframe");
   frame.style.cssText = "width:420px;height:600px;border:0";
   // Prevent the regression itself allocating a giant bitmap in the test machine.
@@ -40,7 +48,7 @@ async function preview(kind: DocumentKind, source: string) {
   </script>`;
   frame.srcdoc = documentPreviewHtml({
     kind,
-    bytes: new TextEncoder().encode(source),
+    bytes: typeof source === "string" ? new TextEncoder().encode(source) : source,
     labels,
   }).replace("<script>window.__paseoDocument=", `${guard}<script>window.__paseoDocument=`);
   document.body.append(frame);
@@ -65,11 +73,13 @@ it("paginates wide sheets within a small cell budget without losing rows", async
   expect(doc.querySelector("table")?.textContent).toContain("R205C200");
 });
 
-function tallPdf(): string {
+function tallPdf(pages = 1): string {
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 30000] /Resources << >> >>",
+    `<< /Type /Pages /Count ${pages} /Kids [${Array.from({ length: pages }, (_, index) => `${index + 3} 0 R`).join(" ")}] >>`,
+    ...Array.from({ length: pages }, () =>
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 30000] /Resources << >> >>",
+    ),
   ];
   let pdf = "%PDF-1.4\n";
   const offsets = [0];
@@ -78,9 +88,9 @@ function tallPdf(): string {
     pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
   });
   const xref = pdf.length;
-  pdf += `xref\n0 4\n0000000000 65535 f \n`;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
   for (const offset of offsets.slice(1)) pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
-  return `${pdf}trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return `${pdf}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
 }
 
 it("bounds tall PDF canvases while retaining zoom and fit controls", async () => {
@@ -99,4 +109,58 @@ it("bounds tall PDF canvases while retaining zoom and fit controls", async () =>
   expect(parseFloat(canvas.style.width)).toBeGreaterThan(initialWidth);
   expect(doc.body.dataset.oversizedCanvas).toBeUndefined();
   expect(canvas.width * canvas.height).toBeLessThanOrEqual(4194304);
+});
+
+it("refits PDFs after pane resizing and hidden restoration while retaining zoom", async () => {
+  const doc = await preview("pdf", tallPdf(2));
+  const canvas = doc.querySelector("canvas")!;
+  const content = doc.querySelector<HTMLElement>("#content")!;
+  const next = Array.from(doc.querySelectorAll("button")).find((b) => b.textContent === "Next")!;
+  next.click();
+  await expect.poll(() => doc.querySelector("#controls")?.textContent).toContain("2 / 2");
+  const larger = Array.from(doc.querySelectorAll("button")).find(
+    (b) => b.textContent === "Zoom in",
+  )!;
+  larger.click();
+  await expect.poll(() => larger.disabled).toBe(false);
+  frame!.style.width = "280px";
+  await expect
+    .poll(() => Math.abs(parseFloat(canvas.style.width) - (content.clientWidth - 24) * 1.25))
+    .toBeLessThan(1);
+  frame!.style.display = "none";
+  frame!.style.width = "360px";
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  frame!.style.display = "block";
+  await expect
+    .poll(() => Math.abs(parseFloat(canvas.style.width) - (content.clientWidth - 24) * 1.25))
+    .toBeLessThan(1);
+  expect(doc.querySelector("#controls")?.textContent).toContain("2 / 2");
+  expect(doc.body.dataset.oversizedCanvas).toBeUndefined();
+  expect(canvas.width * canvas.height).toBeLessThanOrEqual(4194304);
+});
+
+it("resizes and zooms slides without replacing their rendered contents", async () => {
+  const presentation = createPresentation();
+  const layout = getSlideLayouts(presentation)[0];
+  for (const text of ["First slide", "Second slide"]) {
+    const slide = addSlide(presentation, { layout });
+    addSlideTextBox(slide, { x: inches(0.5), y: inches(0.5), w: inches(4), h: inches(1), text });
+  }
+  const doc = await preview("slides", await savePresentation(presentation));
+  const content = doc.querySelector<HTMLElement>("#content")!;
+  const svg = content.querySelector("svg")!;
+  const buttons = Array.from(doc.querySelectorAll("button"));
+  buttons.find((b) => b.textContent === "Zoom in")!.click();
+  expect(content.querySelector("svg")).toBe(svg);
+  expect(Number(svg.getAttribute("width"))).toBe((content.clientWidth - 24) * 1.25);
+  frame!.style.width = "220px";
+  await expect
+    .poll(() => Number(svg.getAttribute("width")) - (content.clientWidth - 24) * 1.25)
+    .toBe(0);
+  buttons.find((b) => b.textContent === "Fit")!.click();
+  expect(Number(svg.getAttribute("width"))).toBe(content.clientWidth - 24);
+  expect(content.querySelector("svg")).toBe(svg);
+  buttons.find((b) => b.textContent === "Next")!.click();
+  expect(content.textContent).toContain("Second slide");
+  expect(doc.querySelector("#controls")?.textContent).toContain("2 / 2");
 });

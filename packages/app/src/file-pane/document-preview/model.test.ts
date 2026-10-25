@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
+import { QueryClient } from "@tanstack/react-query";
 import { decodeDocumentText } from "./runtime/text";
 import { decodeBase64 } from "./runtime/base64";
 import type { FileReadResult } from "@getpaseo/client/internal/daemon-client";
@@ -8,9 +9,36 @@ import {
   documentPreviewKind,
   MAX_DOCUMENT_BYTES,
   readPreviewDocument,
+  shareDocumentBytes,
 } from "./model";
 
 describe("document previews", () => {
+  it("keeps an unchanged revalidated document stable and publishes changed bytes", async () => {
+    const client = new QueryClient();
+    const original = new Uint8Array([1, 2, 3]);
+    // Match a transfer whose bytes are a view into a larger network buffer.
+    const unchanged = new Uint8Array([9, 1, 2, 3, 9]).subarray(1, 4);
+    const changed = new Uint8Array([1, 2, 4]);
+    const responses = [original, unchanged, changed, new Uint8Array()];
+    const options = {
+      queryKey: ["document-revalidation"],
+      queryFn: async () => responses.shift()!,
+      structuralSharing: shareDocumentBytes,
+      staleTime: 0,
+    };
+    try {
+      await client.fetchQuery(options);
+      expect(client.getQueryData(options.queryKey)).toBe(original);
+      await client.fetchQuery(options);
+      expect(client.getQueryData(options.queryKey)).toBe(original);
+      await client.fetchQuery(options);
+      expect(client.getQueryData(options.queryKey)).toBe(changed);
+      await client.fetchQuery(options);
+      expect(client.getQueryData(options.queryKey)).toEqual(new Uint8Array());
+    } finally {
+      client.clear();
+    }
+  });
   it("decodes every byte value without changing binary documents, including empty data", () => {
     const bytes = Uint8Array.from({ length: 256 }, (_, index) => index);
     expect(decodeBase64(Buffer.from(bytes).toString("base64"))).toEqual(bytes);

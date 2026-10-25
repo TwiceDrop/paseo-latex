@@ -1,7 +1,7 @@
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import * as pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import type { DocumentLabels } from "../messages";
-import { button, element } from "./controls";
+import { button, element, observeContentWidth } from "./controls";
 import { decodeBase64 } from "./base64";
 
 declare global {
@@ -50,6 +50,7 @@ export async function renderPdf(
   let number = 1;
   let zoom = 1;
   let busy = false;
+  let resizePending = false;
   const status = element("span");
   const canvas = element("canvas");
   const text = element("div");
@@ -82,15 +83,25 @@ export async function renderPdf(
   retry.hidden = true;
   controls.append(previous, status, next, smaller, larger, fit, retry);
 
-  async function show(): Promise<void> {
-    if (busy) return;
+  async function show(resetScroll = true): Promise<void> {
+    if (busy) {
+      resizePending = true;
+      return;
+    }
+    if (root.clientWidth <= 24) return;
     busy = true;
+    resizePending = false;
     retry.hidden = true;
     buttons.forEach((control) => {
       control.disabled = true;
     });
     try {
       const page = await pdf.getPage(number);
+      // The user may switch workspaces while getPage is pending.
+      if (root.clientWidth <= 24) {
+        page.cleanup();
+        return;
+      }
       const natural = page.getViewport({ scale: 1 });
       const scale = Math.min(2, (root.clientWidth - 24) / natural.width) * zoom;
       const viewport = page.getViewport({ scale });
@@ -118,7 +129,7 @@ export async function renderPdf(
       } finally {
         page.cleanup();
       }
-      root.scrollTo(0, 0);
+      if (resetScroll) root.scrollTo(0, 0);
     } catch {
       text.textContent = labels.failed;
       retry.hidden = false;
@@ -129,7 +140,13 @@ export async function renderPdf(
       });
       previous.disabled = number === 1;
       next.disabled = number === pdf.numPages;
+      // A resize during PDF.js rendering must not be dropped or render concurrently
+      // into the same canvas. The next pass uses the latest visible width.
+      if (resizePending) void show(false);
     }
   }
+  observeContentWidth(root, () => {
+    void show(false);
+  });
   await show();
 }
