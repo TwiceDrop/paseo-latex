@@ -299,7 +299,7 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
     set((state) => {
       const updated = new Map(state.downloads);
       for (const [id, download] of updated) {
-        if (download.status !== "downloading") {
+        if (download.status !== "downloading" && download.status !== "saving") {
           updated.delete(id);
         }
       }

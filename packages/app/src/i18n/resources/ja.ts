@@ -1938,6 +1938,7 @@ export const ja: TranslationResources = {
       creatingAgent: "エージェントを作成中",
     },
     file: {
+      document: en.panels.file.document,
       directoryMissing: "ワークスペースディレクトリが見つかりません。",
       loading: "ファイルを読み込み中...",
       noPreview: "プレビューが利用できません",

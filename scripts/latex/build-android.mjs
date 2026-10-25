@@ -34,6 +34,7 @@ const env = {
   APP_VARIANT: "latex",
   PASEO_LATEX_REVISION: values.revision,
   CI: "1",
+  ...(values["low-memory"] ? { PASEO_LOW_MEMORY_BUILD: "1" } : {}),
 };
 
 function run({ command, args, cwd }) {
@@ -54,6 +55,11 @@ run({
   cwd: repoRoot,
 });
 
+run({
+  command: "npm",
+  args: ["run", "build:document-preview", "--workspace=@getpaseo/app"],
+  cwd: repoRoot,
+});
 run({
   command: "npm",
   args: ["run", "build:math-assets", "--workspace=@getpaseo/app"],
@@ -90,6 +96,7 @@ if (values["prepare-only"]) {
   if (values.arch) gradleArgs.push(`-PreactNativeArchitectures=${values.arch}`);
   if (values["low-memory"]) {
     gradleArgs.push(
+      "-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=768m -XX:ActiveProcessorCount=2",
       "-PpaseoLatexLowMemoryBuild=true",
       "-Pkotlin.compiler.execution.strategy=in-process",
     );
@@ -99,6 +106,7 @@ if (values["prepare-only"]) {
     run({
       command: java,
       args: [
+        ...(values["low-memory"] ? ["-Xmx128m", "-XX:ActiveProcessorCount=2"] : []),
         "-classpath",
         path.join(androidRoot, "gradle/wrapper/gradle-wrapper.jar"),
         "org.gradle.wrapper.GradleWrapperMain",

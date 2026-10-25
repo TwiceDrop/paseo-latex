@@ -1919,6 +1919,7 @@ export const ar: TranslationResources = {
       creatingAgent: "وكيل الخلق",
     },
     file: {
+      document: en.panels.file.document,
       directoryMissing: "لم يتم العثور على دليل Workspace.",
       loading: "جارٍ تحميل الملف...",
       noPreview: "لا تتوفر معاينة",

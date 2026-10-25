@@ -3000,6 +3000,110 @@ test("downloadFile streams chunks to its destination before completion", async (
   expect(progress).toEqual([0, 2, 4]);
 });
 
+test.each([
+  { encoding: "none", content: undefined, size: 5, received: 0 },
+  { encoding: "base64", content: "aGk=", size: 5, received: 2 },
+] as const)(
+  "downloadFile rejects incomplete legacy $encoding content before writing",
+  async ({ encoding, content, size, received }) => {
+    const mock = createMockTransport();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "clsk_download_legacy",
+      logger: createMockLogger(),
+      reconnect: { enabled: false },
+      transportFactory: () => mock.transport,
+    });
+    clients.push(client);
+    const connected = client.connect();
+    mock.triggerOpen();
+    await connected;
+    const chunks: number[][] = [];
+    const result = client.downloadFile("/tmp/project", "report.pdf", {
+      write: (chunk) => chunks.push([...chunk]),
+    });
+    const rejected = expect(result).rejects.toThrow(
+      `File transfer incomplete: expected ${size} bytes, received ${received}.`,
+    );
+    const requestId = JSON.parse(assertStr(mock.sent[0])).message.requestId;
+    mock.triggerMessage(
+      wrapSessionMessage({
+        type: "file_explorer_response",
+        payload: {
+          cwd: "/tmp/project",
+          path: "report.pdf",
+          mode: "file",
+          directory: null,
+          file: {
+            path: "report.pdf",
+            kind: "binary",
+            encoding,
+            content,
+            mimeType: "application/pdf",
+            size,
+            modifiedAt: "2026-05-02T00:00:00.000Z",
+          },
+          error: null,
+          requestId,
+        },
+      }),
+    );
+    await rejected;
+    expect(chunks).toEqual([]);
+  },
+);
+
+test.each([
+  { encoding: "none", content: undefined, size: 0, bytes: [] },
+  { encoding: "utf-8", content: "中文", size: 6, bytes: [...new TextEncoder().encode("中文")] },
+  { encoding: "base64", content: "aGk=", size: 2, bytes: [104, 105] },
+] as const)(
+  "downloadFile saves complete legacy $encoding content",
+  async ({ encoding, content, size, bytes }) => {
+    const mock = createMockTransport();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "clsk_download_legacy_valid",
+      logger: createMockLogger(),
+      reconnect: { enabled: false },
+      transportFactory: () => mock.transport,
+    });
+    clients.push(client);
+    const connected = client.connect();
+    mock.triggerOpen();
+    await connected;
+    const chunks: number[][] = [];
+    const result = client.downloadFile("/tmp/project", "report.txt", {
+      write: (chunk) => chunks.push([...chunk]),
+    });
+    const requestId = JSON.parse(assertStr(mock.sent[0])).message.requestId;
+    mock.triggerMessage(
+      wrapSessionMessage({
+        type: "file_explorer_response",
+        payload: {
+          cwd: "/tmp/project",
+          path: "report.txt",
+          mode: "file",
+          directory: null,
+          file: {
+            path: "report.txt",
+            kind: "text",
+            encoding,
+            content,
+            mimeType: "text/plain",
+            size,
+            modifiedAt: "2026-05-02T00:00:00.000Z",
+          },
+          error: null,
+          requestId,
+        },
+      }),
+    );
+    await expect(result).resolves.toMatchObject({ size, path: "report.txt" });
+    expect(chunks).toEqual([bytes]);
+  },
+);
+
 test("downloadFile rejects a failed destination write instead of reporting success", async () => {
   const mock = createMockTransport();
   const client = new DaemonClient({

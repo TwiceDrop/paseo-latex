@@ -118,6 +118,32 @@ describe("download store transport selection", () => {
     useDownloadStore.setState({ downloads: new Map(), activeDownloadId: null });
   });
 
+  it("keeps transfers and open save dialogs when clearing finished downloads", () => {
+    const statuses = ["downloading", "saving", "complete", "cancelled", "error"] as const;
+    const downloads = statuses.map(
+      (status, index): Download => ({
+        id: status,
+        serverId: "srv_remote",
+        scopeId: "workspace-1",
+        fileName: FILE_NAME,
+        path: `${index}/${FILE_PATH}`,
+        status,
+        startedAt: index,
+      }),
+    );
+    useDownloadStore.setState({
+      downloads: new Map(downloads.map((download) => [download.id, download])),
+      activeDownloadId: "complete",
+    });
+
+    useDownloadStore.getState().dismissAllCompleted();
+
+    expect([...useDownloadStore.getState().downloads.values()]).toEqual(downloads.slice(0, 2));
+    expect(useDownloadStore.getState().activeDownloadId).toBe("saving");
+    useDownloadStore.getState().completeDownload("saving");
+    expect(useDownloadStore.getState().downloads.get("saving")?.status).toBe("complete");
+  });
+
   it("downloads over the session when the active connection is the relay", async () => {
     const token = createTokenRequest();
     const reader = createFileReader(async () => ({

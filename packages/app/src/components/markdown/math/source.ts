@@ -24,14 +24,20 @@ export function prepareMathSource(source: string, streaming = false) {
       }
     } else if ("children" in node) node.children.forEach(protect);
   }
-  protect(fromMarkdown(source));
+  // HTML wrappers are expanded later. Keep their Markdown code visible here,
+  // matching normalizeMarkdownHtml, so literal TeX never gets normalized first.
+  protect(
+    fromMarkdown(source, {
+      extensions: [{ disable: { null: ["htmlFlow", "htmlText"] } }],
+    }),
+  );
   for (const match of source.matchAll(/<(code|pre)\b[^>]*>[\s\S]*?<\/\1\s*>/gi)) {
     protectedRanges.push({ start: match.index, end: match.index + match[0].length });
   }
   protectedRanges.sort((a, b) => a.start - b.start);
   let prefix = "PASEOMATHTOKEN";
   while (source.includes(prefix)) prefix += "X";
-  const replacements: [string, string][] = [];
+  const replacements = new Map<string, string>();
   let masked = "";
   let copied = 0;
   let rangeIndex = 0;
@@ -50,20 +56,22 @@ export function prepareMathSource(source: string, streaming = false) {
     if (!span.complete) normalized = raw.replace(/[\\`*_[\]$]/g, "\\$&");
     else if (raw.startsWith(String.raw`\(`)) normalized = `$${raw.slice(2, -2)}$`;
     else if (raw.startsWith(String.raw`\[`)) normalized = `$$${raw.slice(2, -2)}$$`;
-    const token = `${prefix}${replacements.length}END`;
+    const token = `${prefix}${replacements.size}END`;
     masked += source.slice(copied, index) + token;
-    replacements.push([token, normalized]);
+    replacements.set(token, normalized);
     spans.push({ start: index, end: span.end });
     copied = span.end;
     index = span.end - 1;
   }
   masked += source.slice(copied);
+  const tokenPattern = new RegExp(`${prefix}\\d+END`, "g");
   return {
     source: masked,
     spans,
     restore(value: string) {
-      for (const [token, raw] of replacements) value = value.replaceAll(token, () => raw);
-      return value;
+      // A single scan avoids copying the whole message once per formula. Keep a
+      // callback: a string replacement would interpret $$ and $& inside TeX.
+      return value.replaceAll(tokenPattern, (token) => replacements.get(token) ?? token);
     },
   };
 }

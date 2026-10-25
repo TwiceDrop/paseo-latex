@@ -5,6 +5,7 @@ import { app } from "electron";
 import { UUID } from "builder-util-runtime";
 import log from "electron-log/main";
 import { autoUpdater } from "electron-updater";
+import { isLatexDesktop } from "../distribution.js";
 import {
   createAppUpdateService,
   type AppUpdateCheckResult,
@@ -224,7 +225,9 @@ class ElectronAppUpdateRuntime implements AppUpdateRuntime {
 
 const appUpdateService = createAppUpdateService({
   runtime: new ElectronAppUpdateRuntime(),
-  isPackaged: () => app.isPackaged,
+  // Personal installers are updated by rebuilding; official updates would
+  // replace the custom client and belong to a different installer identity.
+  isPackaged: () => app.isPackaged && !isLatexDesktop,
   now: () => Date.now(),
   bucket: async () => bucketFromStagingUserId(await getStagingUserId()),
   reportCheckError: (error) => {

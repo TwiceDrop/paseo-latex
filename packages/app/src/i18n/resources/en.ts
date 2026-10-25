@@ -1948,6 +1948,18 @@ export const en = {
       loading: "Loading file...",
       noPreview: "No preview available",
       binaryPreviewUnavailable: "Binary preview unavailable",
+      document: {
+        previous: "Previous",
+        next: "Next",
+        zoomIn: "Zoom in",
+        zoomOut: "Zoom out",
+        fit: "Fit width",
+        sheet: "Worksheet",
+        limitedColumns: "Showing the first 200 columns. Download the file to view all columns.",
+        legacy:
+          "Save this document as DOCX or PPTX to preview it here, or download it to open in Office.",
+        tooLarge: "Preview supports files up to 32 MB. Download the file to open it.",
+      },
       tooLargeToDisplay: "This file is too large to display",
       failedToLoad: "Failed to load file",
       failedToLoadPreview: "Failed to load file preview",

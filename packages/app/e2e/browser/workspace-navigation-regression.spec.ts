@@ -96,6 +96,20 @@ async function closeFirstVisibleDraftTab(page: Page): Promise<void> {
 test.describe("Workspace navigation regression", () => {
   test.describe.configure({ timeout: 240_000 });
 
+  test("resolves a cold missing workspace route with the compact sidebar closed", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(buildHostWorkspaceRoute(getServerId(), "missing-cold-workspace"));
+    await expect(page.getByText("Workspace unavailable", { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expectNoLoadingPane(page);
+    await expectMenuButtonVisible(page);
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expectAppRoute(page, "/open-project");
+  });
+
   test("opens a notification's workspace on a different offline host", async ({ page }) => {
     const target = {
       serverId: "notification-offline-host",

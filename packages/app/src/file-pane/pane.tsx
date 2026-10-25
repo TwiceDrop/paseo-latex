@@ -42,6 +42,8 @@ import type { Theme } from "@/styles/theme";
 import { ZoomableImage } from "@/components/zoomable-viewport/image";
 import { useFileDownload } from "@/hooks/use-file-download";
 import { useDownloadStore } from "@/stores/download-store";
+import { documentPreviewKind } from "./document-preview/model";
+import { DocumentPane } from "./document-preview/pane";
 
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const foregroundMutedColorMapping = (theme: Theme) => ({
@@ -234,6 +236,38 @@ function FilePreviewBody({
 }
 
 export function FilePane({
+  serverId,
+  workspaceRoot,
+  location,
+  navigationRevision,
+}: {
+  serverId: string;
+  workspaceRoot: string;
+  location: WorkspaceFileLocation;
+  navigationRevision: number;
+}) {
+  const kind = documentPreviewKind(location.path);
+  if (kind && !(kind === "text" && location.lineStart))
+    return (
+      <DocumentPane
+        key={`${serverId}:${workspaceRoot}:${location.path}`}
+        serverId={serverId}
+        workspaceRoot={workspaceRoot}
+        path={location.path}
+        kind={kind}
+      />
+    );
+  return (
+    <TextFilePane
+      serverId={serverId}
+      workspaceRoot={workspaceRoot}
+      location={location}
+      navigationRevision={navigationRevision}
+    />
+  );
+}
+
+function TextFilePane({
   serverId,
   workspaceRoot,
   location,

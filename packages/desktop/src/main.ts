@@ -4,14 +4,12 @@ protectConsoleStreams();
 process.emitWarning = (() => {}) as typeof process.emitWarning;
 
 import log from "electron-log/main";
-log.transports.console.level = "info";
-log.initialize({ spyRendererConsole: true });
 
 import { inheritLoginShellEnv } from "./login-shell-env.js";
 
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { existsSync } from "node:fs";
+import { constants, copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import {
   app,
@@ -110,12 +108,13 @@ import {
   type AgentDeepLinkTarget,
 } from "@getpaseo/protocol/agent-deep-link";
 import { AgentNavigationInbox, parseAgentDeepLinkFromArgv } from "./agent-navigation.js";
+import { desktopAppId, desktopProductName, isLatexDesktop } from "./distribution.js";
 
 const DEV_SERVER_URL = process.env.EXPO_DEV_URL ?? "http://localhost:8081";
 const APP_SCHEME = "paseo";
 const PASEO_DEBUG = process.env.PASEO_DEBUG === "1";
 const DISABLE_SINGLE_INSTANCE_LOCK = process.env.PASEO_DISABLE_SINGLE_INSTANCE_LOCK === "1";
-const APP_NAME = process.env.PASEO_TEST_APP_NAME?.trim() || "Paseo";
+const APP_NAME = process.env.PASEO_TEST_APP_NAME?.trim() || desktopProductName;
 const DESKTOP_WINDOW_CHROME_MODE = resolveDesktopWindowChromeMode({
   platform: process.platform,
   override: process.env.PASEO_DESKTOP_WINDOW_CONTROLS,
@@ -135,6 +134,18 @@ const bootstrapComplete = new Promise<void>((resolve) => {
 let bootstrapIsComplete = false;
 
 app.setName(APP_NAME);
+if (isLatexDesktop) {
+  const userData =
+    process.env.PASEO_ELECTRON_USER_DATA_DIR?.trim() ||
+    path.join(app.getPath("appData"), desktopProductName);
+  app.setPath("userData", userData);
+  // Never inspect, restart, or upgrade the official desktop's managed daemon.
+  process.env.PASEO_HOME = path.join(userData, "daemon");
+  process.env.PASEO_LISTEN = "127.0.0.1:0";
+}
+if (process.platform === "win32") app.setAppUserModelId(desktopAppId);
+log.transports.console.level = "info";
+log.initialize({ spyRendererConsole: true });
 log.info("[desktop] app startup", {
   version: app.getVersion(),
   platform: process.platform,
@@ -925,6 +936,22 @@ async function runCliPassthroughIfRequested(): Promise<boolean> {
 async function bootstrap(): Promise<void> {
   if (!setupSingleInstanceLock()) {
     return;
+  }
+
+  if (isLatexDesktop) {
+    // Managed launches deliberately ignore PASEO_LISTEN. Seed the private
+    // persisted configuration once, while holding this profile's instance lock.
+    const home = process.env.PASEO_HOME!;
+    mkdirSync(home, { recursive: true });
+    try {
+      copyFileSync(
+        path.join(process.resourcesPath, "latex-daemon-config.json"),
+        path.join(home, "config.json"),
+        constants.COPYFILE_EXCL,
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
   }
 
   await app.whenReady();

@@ -1967,6 +1967,7 @@ export const es: TranslationResources = {
       creatingAgent: "Agente creador",
     },
     file: {
+      document: en.panels.file.document,
       directoryMissing: "No se encontró el directorio de Workspace.",
       loading: "Cargando archivo...",
       noPreview: "No hay vista previa disponible",

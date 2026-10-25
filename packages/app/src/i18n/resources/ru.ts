@@ -1951,6 +1951,7 @@ export const ru: TranslationResources = {
       creatingAgent: "Создание агента",
     },
     file: {
+      document: en.panels.file.document,
       directoryMissing: "Каталог рабочего пространства не найден.",
       loading: "Загрузка файла...",
       noPreview: "Предварительный просмотр недоступен",

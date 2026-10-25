@@ -4861,6 +4861,11 @@ export class DaemonClient {
       }
       const result = legacyExplorerFileToBytes(payload.file);
       if (sink) {
+        if (result.bytes.byteLength !== result.size) {
+          throw new Error(
+            `File transfer incomplete: expected ${result.size} bytes, received ${result.bytes.byteLength}.`,
+          );
+        }
         sink.write(result.bytes);
         sink.progress?.(result.bytes.byteLength, result.size);
         result.bytes = new Uint8Array();

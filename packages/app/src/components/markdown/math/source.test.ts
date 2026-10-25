@@ -45,10 +45,29 @@ describe("math in the enriched Markdown renderer", () => {
     expect(prepared.restore(prepared.source)).toBe("> $$\n> x = y\n> $$\n\n- $$\n  x = y\n  $$");
   });
 
+  it("keeps fenced TeX literal inside an HTML wrapper that source adaptation expands", () => {
+    const source = "<details>\n<summary>Example</summary>\n```tex\n\\[x^2\\]\n```\n</details>";
+    const prepared = prepareMathSource(source);
+    expect(prepared.spans).toEqual([]);
+    expect(prepared.restore(prepareMarkdownSource(prepared.source).render())).toContain(
+      "```tex\n\\[x^2\\]\n```",
+    );
+  });
+
   it("does not mistake a user-written placeholder for a formula", () => {
     const source = String.raw`PASEOMATHTOKEN0END and \(x\)`;
     const prepared = prepareMathSource(source);
     expect(prepared.restore(prepared.source)).toBe("PASEOMATHTOKEN0END and $x$");
+  });
+
+  it("restores repeated formula tokens in long messages without interpreting dollar replacements", () => {
+    const formulas = Array.from({ length: 300 }, (_, index) => `$$x_{${index}}$$`);
+    const source = `PASEOMATHTOKEN0END\n\n${formulas.join("\n\n")}`;
+    const prepared = prepareMathSource(source);
+    expect(prepared.spans).toHaveLength(300);
+    expect(prepared.restore(`${prepared.source}\n${prepared.source}`)).toBe(`${source}\n${source}`);
+    // Restoring more than once must not depend on a global RegExp's lastIndex.
+    expect(prepared.restore(prepared.source)).toBe(source);
   });
 
   it("keeps a multiline formula in a single native view at every streaming prefix", () => {

@@ -82,6 +82,7 @@
     "start": "npm run start --workspace=@getpaseo/server",
     "android": "npm run android --workspace=@getpaseo/app",
     "android:latex": "node scripts/latex/build-android.mjs",
+    "windows:latex": "node scripts/latex/build-windows.mjs",
     "latex:keygen": "node scripts/latex/signing.mjs",
     "latex:update": "node scripts/latex/update.mjs",
     "android:development": "npm run android:development --workspace=@getpaseo/app",

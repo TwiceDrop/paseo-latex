@@ -29,6 +29,40 @@ buffering a whole APK through `readFile()` duplicates large byte arrays in memor
 The Android document picker lives in `modules/paseo-file-download`; using
 `ACTION_CREATE_DOCUMENT` permits saving to Downloads without broad storage access.
 
+## Document previews
+
+Open a file from Explorer or a chat file link. DOCX documents render paragraphs,
+tables and page breaks; PPTX presentations have page and zoom controls. XLSX,
+XLS and CSV files have a worksheet selector and pages of up to 200 rows / 2,000
+cells. Wide sheets use fewer rows per page. PDF files render
+one page at a time with zoom controls. TXT, LOG and configuration text recognize
+UTF-8, UTF-16 BOMs and GB18030. Existing code, Markdown, HTML and image views
+keep their own renderers.
+
+The document viewer reads at most 32 MB over the existing authenticated session.
+It runs in an isolated iframe or native WebView with its parsers, PDF CMaps and
+standard fonts bundled locally. It does not upload documents to an Office service.
+Old binary DOC/PPT documents must be saved as DOCX/PPTX or downloaded to open in
+Office. Excel previews show cached values; they do not calculate formulas or
+render embedded charts, and show at most 200 columns. Complex Office layout can
+differ from the desktop applications.
+
+Retained document panes reuse the fetched bytes for 30 seconds during rapid tab
+or workspace switches. Reopening a pane revalidates immediately; returning after
+30 seconds also revalidates. Hidden panes do not initiate reads. Native workspace
+retention remains limited to one workspace to bound memory and preserve Fabric
+ownership. PDF backing canvases are capped at 4,194,304 pixels and 8,192 pixels per
+side (about 16 MiB of RGBA storage); CSS zoom remains available, with reduced
+raster resolution on very large pages. Binary decoding writes directly into a
+typed array instead of allocating a temporary array for every character.
+
+After changing the viewer runtime or parser dependencies, run
+`npm run build:document-preview --workspace=@getpaseo/app`. The generated viewer
+is checked in, and `android:latex` rebuilds it before packaging. Keep the ZIP
+expansion and byte-count limits at the file boundary. Disable DOCX altChunks and
+keep frame navigation and external resources blocked; document content must not
+gain access to the app or its host credentials.
+
 ## Markdown engine updates
 
 From 0.12, chat uses Enriched Markdown's native math renderer on Android and
@@ -109,9 +143,10 @@ To test the same APK on an ARM64 phone and an x86_64 emulator, include both ABIs
 npm run android:latex -- --arch arm64-v8a,x86_64
 ```
 
-If Hermes exhausts local memory, add `--low-memory`. This serializes Gradle
-workers and uses Hermes `-Og` instead of `-O`; it still builds a signed release
-APK, with fewer compiler optimizations:
+If the build exhausts local memory, add `--low-memory`. This uses one Gradle and
+Metro worker, limits the Gradle heap to 2 GB, and uses Hermes `-Og` instead of
+`-O`. Close test emulators while compiling. It still builds a signed release APK,
+with fewer compiler optimizations:
 
 ```powershell
 npm run android:latex -- --arch arm64-v8a --low-memory
@@ -129,6 +164,41 @@ npm run android:latex -- --arch arm64-v8a --revision 2
 
 Revisions range from 1 through 99. A newer upstream version starts at revision 1.
 Its Android version code exceeds the previous upstream version's revisions.
+
+## Build a Windows installer
+
+Run `npm run windows:latex` on Windows for an x64 NSIS installer. It includes the
+current renderer changes and writes to
+`artifacts/windows-latex-<version>-r<revision>/`. Use `-- --revision 2` for another
+delivery of the same upstream version; the build refuses to overwrite an existing
+installer.
+
+Install **Paseo LaTeX** alongside official Paseo. The installer lets you choose a
+separate directory. Its app ID, uninstall registration, executable and shortcuts
+are independent. It leaves the official `paseo:` URL handler registered to Paseo.
+Settings and browser storage live under `%APPDATA%/Paseo LaTeX`; its built-in host
+uses the `daemon` subdirectory and a free loopback port. Add the original host by
+IP/Tailscale to use its existing workspaces. The optional CLI installs as
+`paseo-latex`, leaving the official `paseo` command in place.
+
+Official automatic updates are disabled for this distribution. Rebuild the
+personal installer after merging upstream and increase its revision. The runtime
+version stays equal to the bundled host version; the Windows file version carries
+the revision so host management does not repeatedly restart on a version mismatch.
+
+This build runs compilers sequentially and uses one Metro worker. Node heaps are
+limited to 1.5 GB, with 2 GB for the renderer export. It checks for 3 GB of free
+memory before exporting, 2 GB before other steps, and stops its own build process
+tree if free memory falls below 1 GB. Low-memory server
+builds use the repository's native TypeScript compiler with a 1 GB Go heap target
+and two CPUs. Normal builds keep the upstream compiler. Do not run emulators or
+heavy tests alongside packaging. Windows signing requires a separate code-signing
+certificate; the personal Android keystore cannot sign this installer.
+
+After an interrupted renderer/package step, `-- --resume` reuses the already-built
+dependencies. Only use it while those source files are unchanged.
+For a desktop-wrapper-only change, `-- --package-only` also reuses the exported
+renderer. Rebuild the renderer whenever app source changes.
 
 ## Merge an upstream release
 

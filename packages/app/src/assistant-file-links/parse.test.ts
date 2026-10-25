@@ -108,6 +108,23 @@ describe("parseFileProtocolUrl", () => {
 });
 
 describe("classifyAssistantFileLink", () => {
+  it("recognizes document filenames in chat as workspace file candidates", () => {
+    for (const name of [
+      "report.docx",
+      "slides.pptx",
+      "budget.xlsx",
+      "legacy.xls",
+      "notes.pdf",
+      "data.csv",
+      "server.log",
+    ]) {
+      expect(classifyAssistantFileLink(name, { workspaceRoot: "/project" })).toMatchObject({
+        kind: "ambiguousFileCandidate",
+        target: { path: `/project/${name}` },
+      });
+    }
+  });
+
   it("keeps explicit external URLs out of file parsing", () => {
     expect(
       classifyAssistantFileLink("http://dumm.md", {

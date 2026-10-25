@@ -1952,6 +1952,7 @@ export const ptBR: TranslationResources = {
       creatingAgent: "Criando agente",
     },
     file: {
+      document: en.panels.file.document,
       directoryMissing: "Diretório do workspace não encontrado.",
       loading: "Carregando arquivo...",
       noPreview: "Nenhuma prévia disponível",

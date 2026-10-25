@@ -1929,6 +1929,7 @@ export const ko: TranslationResources = {
       creatingAgent: "에이전트 생성 중",
     },
     file: {
+      document: en.panels.file.document,
       directoryMissing: "워크스페이스 디렉터리를 찾을 수 없습니다.",
       loading: "파일 불러오는 중...",
       noPreview: "사용 가능한 미리보기가 없습니다",

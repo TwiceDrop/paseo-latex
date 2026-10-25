@@ -3,13 +3,15 @@ import { createRequire } from "node:module";
 import { resolveCliShimPath } from "./path.js";
 import os from "node:os";
 import { app } from "electron";
+import { isLatexDesktop } from "../../distribution.js";
 
 export function getLocalBinDir(): string {
   return path.join(os.homedir(), ".local", "bin");
 }
 
 export function getCliTargetPath(): string {
-  const filename = process.platform === "win32" ? "paseo.cmd" : "paseo";
+  const command = isLatexDesktop ? "paseo-latex" : "paseo";
+  const filename = process.platform === "win32" ? `${command}.cmd` : command;
   return path.join(getLocalBinDir(), filename);
 }
 

@@ -66,7 +66,7 @@ y, & 0\le y\le1,\\
   expect(paragraph.height).toBeGreaterThanOrEqual(inlineMath.height);
   await page
     .elementLocator(container)
-    .screenshot({ path: "../../../../../../artifacts/latex-0120-web.png" });
+    .screenshot({ path: "../../../../../../artifacts/review-latex-web.png" });
 });
 
 it("keeps currency, escaped dollars, inline code and fenced source literal", async () => {
@@ -90,4 +90,13 @@ it("copies rendered MathML back to TeX without losing the source", async () => {
   const copied = createAssistantSelectionClipboardContent(selection)!.plainText;
   expect(copied).toContain("$x^2$");
   expect(copied).toContain("$$\\int_0^1 x\\,dx$$");
+});
+
+it("renders TeX examples inside HTML details as literal code", async () => {
+  const container = mount(
+    "<details>\n<summary>Example</summary>\n```tex\n\\[x^2\\]\n```\n</details>\n\nActual: $y^2$.",
+  );
+  await expect.poll(() => container.querySelectorAll('[role="math"] math').length).toBe(1);
+  expect(container.querySelector("pre")!.textContent).toContain(String.raw`\[x^2\]`);
+  expect(container.querySelector('[role="math"]')!.getAttribute("aria-label")).toBe("y^2");
 });
