@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { relative as relativePath } from "node:path";
+import { relative as relativePath, resolve as resolvePath } from "node:path";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
+import { fileURLToPath } from "node:url";
 
 const repoRoot = new URL("../", import.meta.url);
 const ciWorkflowPath = new URL(".github/workflows/ci.yml", repoRoot);
@@ -76,7 +77,7 @@ function filesUnder(relativeDirectory, predicate) {
   return readdirSync(directory, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) =>
-      [relativeDirectory, relativePath(directory.pathname, entry.parentPath), entry.name]
+      [relativeDirectory, relativePath(fileURLToPath(directory), entry.parentPath), entry.name]
         .filter(Boolean)
         .join("/")
         .replaceAll("\\", "/"),
@@ -410,11 +411,16 @@ test("quality preserves commands and routes each domain independently after fail
     Object.values(commands).flat(),
   );
   const domains = Object.keys(commands);
-  function accepts(expression, outputs, { cancelled = false, installed = true } = {}) {
+  function accepts(
+    expression,
+    outputs,
+    { cancelled = false, installed = true, repository = "getpaseo/paseo" } = {},
+  ) {
     // Prior checks have failed: success() is false. Explicit !cancelled() must
     // override Actions' default success condition so later domains still run.
     assert.match(expression, /!cancelled\(\)/);
     return runInNewContext(expression, {
+      github: { repository },
       needs: { changes: { outputs } },
       steps: { install: { outcome: installed ? "success" : "failure" } },
       cancelled: () => cancelled,
@@ -438,6 +444,7 @@ test("quality preserves commands and routes each domain independently after fail
     assert.equal(accepts(expression, {}, { installed: false }), false);
   }
   assert.equal(accepts(jobCondition, {}, { cancelled: true }), false);
+  assert.equal(accepts(jobCondition, {}, { repository: "TwiceDrop/paseo-latex" }), false);
 });
 
 test("Windows units and integration run independently with complete routed coverage", () => {
@@ -490,19 +497,33 @@ test("Windows units and integration run independently with complete routed cover
     'vitest run --maxWorkers=1 src/server/daemon-e2e/git-operations.e2e.test.ts src/server/session.create-agent-worktree-autoarchive.e2e.test.ts src/server/agent/providers/opencode-bridge.local.e2e.test.ts src/server/daemon-e2e/relay-transport.e2e.test.ts -t "merges into|creates a worktree and auto-archives both|versioned runtime|oversized attachments|connected hosts|password-protected daemon refuses"',
   );
   const serverConfig = readFileSync(new URL("packages/server/vitest.config.ts", repoRoot), "utf8");
-  assert.doesNotMatch(serverConfig, /maxWorkers/);
+  function workerLimit(platform) {
+    const config = runInNewContext(serverConfig.slice(serverConfig.indexOf("defineConfig(")), {
+      defineConfig: (configuration) => configuration,
+      path: { resolve: resolvePath },
+      __dirname: fileURLToPath(new URL("packages/server/", repoRoot)),
+      process: { platform },
+    });
+    return config.test.maxWorkers;
+  }
+  assert.equal(workerLimit("win32"), 1);
+  assert.equal(workerLimit("linux"), undefined);
+  assert.equal(workerLimit("darwin"), undefined);
 
   function condition(job) {
     return /    if: \$\{\{ (.+) \}\}/.exec(job)[1];
   }
-  function selected(expression, outputs, cancelled = false) {
+  function selected(expression, outputs, cancelled = false, repository = "getpaseo/paseo") {
     return runInNewContext(expression, {
+      github: { repository },
       needs: { changes: { outputs } },
       cancelled: () => cancelled,
     });
   }
   const unitCondition = condition(windows);
   const integrationCondition = condition(integration);
+  assert.equal(selected(unitCondition, {}, false, "TwiceDrop/paseo-latex"), false);
+  assert.equal(selected(integrationCondition, {}, false, "TwiceDrop/paseo-latex"), false);
   const unitStep = /      - name: Run server unit tests\n        if: \$\{\{ (.+) \}\}/.exec(
     windows,
   )[1];
