@@ -73,7 +73,7 @@ jobs:
           npm run format -- --threads=2
           mkdir -p artifacts
           git diff --binary > artifacts/latex-source-format.patch
-          git diff --exit-code -- . ':!**/*.gen.ts' ':!**/*.gen.tsx'
+          git diff --exit-code
       - name: Upload compiled web client
         if: success()
         uses: actions/upload-artifact@v4
