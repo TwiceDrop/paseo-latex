@@ -41,6 +41,15 @@ tsconfig.tsbuildinfo
 
 # Testing
 coverage/
+**/.vitest-attachments/
+
+# Personal Android signing material stays outside source control.
+*.keystore
+*.jks
+*.p12
+*.pfx
+credentials.json
+/paseo-latex-signing/
 
 # Playwright
 test-results/

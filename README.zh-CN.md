@@ -1,3 +1,5 @@
+> **Paseo LaTeX 个人分支**：保留公式、文档预览、下载与导航补丁。云端或新电脑首次编译请看[干净检出构建说明](docs/latex-client.md#build-from-a-clean-checkout)。下方保留官方 Paseo 介绍。
+
 <p align="center">
   <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo logo">
 </p>

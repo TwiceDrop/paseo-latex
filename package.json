@@ -126,6 +126,8 @@
     "android:latex": "node scripts/latex/build-android.mjs",
     "windows:latex": "node scripts/latex/build-windows.mjs",
     "latex:keygen": "node scripts/latex/signing.mjs",
+    "latex:prepare": "node scripts/latex/prepare.mjs",
+    "latex:web": "node scripts/latex/build-web.mjs",
     "latex:update": "node scripts/latex/update.mjs"
   },
   "devDependencies": {

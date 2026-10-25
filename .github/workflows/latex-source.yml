@@ -1,0 +1,117 @@
+name: LaTeX Source Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      windows:
+        description: Build the independent Windows x64 installer
+        type: boolean
+        default: false
+      revision:
+        description: Personal Windows build revision (1 through 99)
+        type: string
+        default: "4"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: latex-source-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ONNXRUNTIME_NODE_INSTALL: skip
+  NODE_OPTIONS: --max-old-space-size=2048
+  PASEO_LOW_MEMORY_BUILD: "1"
+  GOMEMLIMIT: 1024MiB
+  GOMAXPROCS: "2"
+  CI: "1"
+
+jobs:
+  source:
+    if: github.repository == 'TwiceDrop/paseo-latex'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked dependencies
+        run: node scripts/npm-retry.mjs ci --ignore-scripts --no-audit --no-fund
+      - name: Apply tracked vendor patches
+        run: npm run postinstall
+      - name: Build clean-checkout dependencies and resources
+        run: npm run latex:prepare
+      - name: Compile bundled host and CLI
+        run: |
+          npm run build --workspace=@getpaseo/server
+          npm run build --workspace=@getpaseo/cli
+      - name: Typecheck clients
+        run: |
+          npm run typecheck --workspace=@getpaseo/app
+          npm run typecheck --workspace=@getpaseo/client
+          npm run typecheck --workspace=@getpaseo/desktop
+      - name: Lint
+        run: npm run lint -- --threads=2
+      - name: Check workflow contracts
+        run: node --test scripts/ci-workflow.test.mjs
+      - name: Run targeted client regression tests
+        run: npm run test --workspace=@getpaseo/app -- --project unit src/file-pane/document-preview/model.test.ts src/file-panels/catalog.test.ts src/components/markdown/renderer.test.ts src/components/markdown/math/source.test.ts --maxWorkers=1 --bail=1
+      - name: Install browser runtime
+        run: npm exec -- playwright install --with-deps chromium
+      - name: Run real document and math browser regression tests
+        run: npm run test:browser --workspace=@getpaseo/app -- src/file-pane/document-preview/runtime.browser.test.ts src/components/markdown/math/enriched.browser.test.tsx --maxWorkers=1
+      - name: Compile the personal web client
+        run: npm run latex:web
+      - name: Check source formatting
+        run: |
+          npm run format -- --threads=2
+          mkdir -p artifacts
+          git diff --binary > artifacts/latex-source-format.patch
+          git diff --exit-code -- . ':!**/*.gen.ts' ':!**/*.gen.tsx'
+      - name: Upload compiled web client
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paseo-latex-web-${{ github.sha }}
+          path: packages/app/dist
+          retention-days: 7
+      - name: Upload formatting diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: latex-source-diagnostics-${{ github.sha }}
+          path: artifacts/latex-source-format.patch
+          if-no-files-found: ignore
+          retention-days: 7
+
+  windows:
+    if: github.repository == 'TwiceDrop/paseo-latex' && github.event_name == 'workflow_dispatch' && inputs.windows
+    needs: source
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked dependencies
+        run: node scripts/npm-retry.mjs ci --ignore-scripts --no-audit --no-fund
+      - name: Apply tracked vendor patches
+        run: npm run postinstall
+      - name: Build independent Windows installer
+        env:
+          PASEO_LATEX_BUILD_REVISION: ${{ inputs.revision }}
+        run: npm run windows:latex -- --revision $env:PASEO_LATEX_BUILD_REVISION
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paseo-latex-windows-${{ github.sha }}
+          path: artifacts/windows-latex-*/Paseo-LaTeX-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 7

@@ -77,8 +77,9 @@ function tallPdf(pages = 1): string {
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     `<< /Type /Pages /Count ${pages} /Kids [${Array.from({ length: pages }, (_, index) => `${index + 3} 0 R`).join(" ")}] >>`,
-    ...Array.from({ length: pages }, () =>
-      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 30000] /Resources << >> >>",
+    ...Array.from(
+      { length: pages },
+      () => "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 30000] /Resources << >> >>",
     ),
   ];
   let pdf = "%PDF-1.4\n";

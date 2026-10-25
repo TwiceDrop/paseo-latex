@@ -4,6 +4,15 @@ Paseo is a mobile app for monitoring and controlling your local AI coding agents
 
 **Supported agents:** Claude Code, Codex, GitHub Copilot, OpenCode, Pi, Antigravity, and Muse Code.
 
+## Personal LaTeX fork
+
+This checkout is the TwiceDrop/paseo-latex fork. Read [docs/latex-client.md](docs/latex-client.md)
+before building or updating it. `main` and `paseo-latex` carry the personal client;
+preserve its math, document previews, downloads, navigation fixes and independent app identity.
+Use `npm ci --ignore-scripts`, `npm run postinstall`, then `npm run latex:prepare`
+on a clean checkout. Signing keys and local `artifacts/` or `.dev/` files are not source dependencies.
+Keep this `AGENTS.md` symlink pointing to `CLAUDE.md`.
+
 ## Repository map
 
 This is an npm workspace monorepo:

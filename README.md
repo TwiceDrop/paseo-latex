@@ -1,3 +1,5 @@
+> **Paseo LaTeX personal fork:** includes the maintained math, document preview, download and navigation patches. For a clean clone or cloud build, use the [fork build guide](docs/latex-client.md#build-from-a-clean-checkout). Upstream Paseo documentation follows.
+
 <p align="center">
   <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo logo">
 </p>
