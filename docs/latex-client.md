@@ -52,6 +52,15 @@ signed APK and its `sh.paseo.latex` identity, then removes the signing files.
 Both build options share the revision input; a new upstream version starts at 1.
 Successful builds are available as Actions artifacts; they do not create a release.
 
+The workflow's `publish_only` mode publishes an existing draft personal release.
+It requires the release tag, the successful Windows build run ID, and a temporary
+`build-assets/<release-tag>` branch containing only APK parts and `manifest.json`.
+The manifest binds both installers' SHA-256 hashes and the Android signing
+certificate to the tagged source commit. The publisher checks the source and
+Windows jobs, reconstructs and verifies the APK, then uploads both installers and
+`SHA256SUMS.txt` before publishing. Remove the temporary assets branch afterward.
+Signing keys and credentials must never enter that branch.
+
 For Android, install JDK 21, the Android SDK/NDK required by Expo 57 / RN 0.86,
 and restore the **existing** personal signing directory outside the checkout.
 Set `PASEO_LATEX_SIGNING_DIR` to that directory when it is not the default sibling

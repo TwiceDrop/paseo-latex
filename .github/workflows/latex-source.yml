@@ -6,6 +6,19 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      publish_only:
+        description: Publish verified existing Android and Windows build outputs
+        type: boolean
+        default: false
+      release_tag:
+        description: Existing personal release tag for publish-only mode
+        type: string
+      build_run_id:
+        description: Successful Windows build run ID for publish-only mode
+        type: string
+      android_assets_ref:
+        description: Temporary branch containing APK parts and their checksum manifest
+        type: string
       android:
         description: Build the signed personal Android ARM64 APK
         type: boolean
@@ -36,7 +49,7 @@ env:
 
 jobs:
   source:
-    if: github.repository == 'TwiceDrop/paseo-latex'
+    if: github.repository == 'TwiceDrop/paseo-latex' && !inputs.publish_only
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -191,3 +204,110 @@ jobs:
           path: artifacts/windows-latex-*/Paseo-LaTeX-Setup-*.exe
           if-no-files-found: error
           retention-days: 7
+
+  publish:
+    if: github.repository == 'TwiceDrop/paseo-latex' && github.event_name == 'workflow_dispatch' && inputs.publish_only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      BUILD_RUN_ID: ${{ inputs.build_run_id }}
+      ANDROID_ASSETS_REF: ${{ inputs.android_assets_ref }}
+    steps:
+      - name: Verify release and build source
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^latex-v[0-9]+\.[0-9]+\.[0-9]+-r[1-9][0-9]?$ ]]
+          [[ "$BUILD_RUN_ID" =~ ^[0-9]+$ ]]
+          test "$ANDROID_ASSETS_REF" = "build-assets/$RELEASE_TAG"
+          sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID" --jq .head_sha)" = "$sha"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID/jobs" --jq '[.jobs[] | select(.name == "source" or .name == "windows")] | length == 2 and all(.[]; .conclusion == "success")')" = true
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: paseo-latex-windows-${{ steps.source.outputs.sha }}
+          path: windows
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.build_run_id }}
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.android_assets_ref }}
+          path: incoming
+          persist-credentials: false
+      - name: Reconstruct and verify release files
+        env:
+          EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import crypto from 'node:crypto';
+          import assert from 'node:assert/strict';
+          const manifest = JSON.parse(fs.readFileSync('incoming/manifest.json', 'utf8'));
+          assert.equal(manifest.sourceSha, process.env.EXPECTED_SOURCE_SHA);
+          const [, version, revision] = /^latex-v([0-9]+\.[0-9]+\.[0-9]+)-r([1-9][0-9]?)$/.exec(process.env.RELEASE_TAG);
+          const apkName = `paseo-latex-${version}-r${revision}.apk`;
+          const exeName = `Paseo-LaTeX-Setup-${version}-r${revision}-x64.exe`;
+          assert.equal(manifest.fileName, apkName);
+          assert.match(manifest.sha256, /^[a-f0-9]{64}$/);
+          assert.match(manifest.windowsSha256, /^[a-f0-9]{64}$/);
+          assert.match(manifest.certificateSha256, /^[a-f0-9]{64}$/);
+          assert.ok(Array.isArray(manifest.parts) && manifest.parts.length > 0 && manifest.parts.length <= 64);
+          assert.equal(new Set(manifest.parts).size, manifest.parts.length);
+          fs.mkdirSync('publish');
+          const digest = crypto.createHash('sha256');
+          const fd = fs.openSync(path.join('publish', apkName), 'wx');
+          let size = 0;
+          try {
+            for (const [index, part] of manifest.parts.entries()) {
+              assert.equal(part, `apk.part${String(index).padStart(3, '0')}`);
+              const bytes = fs.readFileSync(path.join('incoming', part));
+              digest.update(bytes);
+              size += bytes.length;
+              fs.writeFileSync(fd, bytes);
+            }
+          } finally {
+            fs.closeSync(fd);
+          }
+          assert.equal(size, manifest.size);
+          assert.equal(digest.digest('hex'), manifest.sha256);
+          const installers = fs.readdirSync('windows', { recursive: true }).filter(file => path.basename(file) === exeName);
+          assert.equal(installers.length, 1);
+          const windows = fs.readFileSync(path.join('windows', installers[0]));
+          assert.equal(windows.subarray(0, 2).toString(), 'MZ');
+          assert.equal(crypto.createHash('sha256').update(windows).digest('hex'), manifest.windowsSha256);
+          fs.writeFileSync(path.join('publish', exeName), windows, { flag: 'wx' });
+          fs.writeFileSync('publish/SHA256SUMS.txt', `${manifest.sha256}  ${apkName}\n${manifest.windowsSha256}  ${exeName}\n`);
+          console.log('Both release files match their verified SHA-256 checksums and source commit.');
+          JS
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Verify Android signature and application ID
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=(publish/*.apk)
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          apkanalyzer="$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/apkanalyzer' -type f | sort -V | tail -n 1)"
+          "$apksigner" verify --print-certs "${apk[0]}" > certificate.txt
+          expected="$(node -pe "JSON.parse(require('fs').readFileSync('incoming/manifest.json')).certificateSha256")"
+          actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' certificate.txt)"
+          test "$actual" = "$expected"
+          test "$("$apkanalyzer" manifest application-id "${apk[0]}")" = sh.paseo.latex
+      - name: Upload verified files and publish release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" publish/*.apk publish/*.exe publish/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
