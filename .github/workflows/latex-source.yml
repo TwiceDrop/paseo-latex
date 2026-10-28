@@ -304,7 +304,7 @@ jobs:
           "$apksigner" verify --print-certs "${apk[0]}" > certificate.txt
           cat certificate.txt
           expected="$(node -pe "JSON.parse(require('fs').readFileSync('incoming/manifest.json')).certificateSha256")"
-          actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' certificate.txt | tr -d '\r' | tr 'A-F' 'a-f')"
+          actual="$(sed -nE 's/^(Signer #[0-9]+|V[0-9.]+ Signer): certificate SHA-256 digest: //p' certificate.txt | tr -d '\r' | tr 'A-F' 'a-f' | sort -u)"
           printf 'Expected certificate SHA-256: %s\nActual certificate SHA-256: %s\n' "$expected" "$actual"
           test "$actual" = "$expected"
           app_id="$("$apkanalyzer" manifest application-id "${apk[0]}")"
