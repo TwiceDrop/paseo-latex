@@ -18,8 +18,14 @@ const originalAppVariant = process.env.APP_VARIANT;
 const originalLatexRevision = process.env.PASEO_LATEX_REVISION;
 const originalPersonalProjectId = process.env.PASEO_LATEX_EAS_PROJECT_ID;
 
+function loadAndroidConfig() {
+  // Expo 57 caches this module; each build variant must read the current environment.
+  delete require.cache[require.resolve("./app.config.js")];
+  return getPrebuildConfigAsync(__dirname, { platforms: ["android"] });
+}
+
 async function resolveAndroidManifest() {
-  const { exp } = await getPrebuildConfigAsync(__dirname, { platforms: ["android"] });
+  const { exp } = await loadAndroidConfig();
   await compileModsAsync(exp, {
     projectRoot: __dirname,
     introspect: true,
@@ -47,7 +53,7 @@ describe("Android app config", () => {
   it("builds LaTeX as a separate app without the official Expo account", async () => {
     process.env.APP_VARIANT = "latex";
     delete process.env.PASEO_LATEX_EAS_PROJECT_ID;
-    const { exp } = await getPrebuildConfigAsync(__dirname, { platforms: ["android"] });
+    const { exp } = await loadAndroidConfig();
     expect(exp.name).toBe("Paseo LaTeX");
     expect(exp.android.package).toBe("sh.paseo.latex");
     expect(exp.slug).toBe("paseo-latex");
@@ -59,7 +65,7 @@ describe("Android app config", () => {
   it("can use a personal Expo project for push notifications", async () => {
     process.env.APP_VARIANT = "latex";
     process.env.PASEO_LATEX_EAS_PROJECT_ID = "11111111-2222-4333-8444-555555555555";
-    const { exp } = await getPrebuildConfigAsync(__dirname, { platforms: ["android"] });
+    const { exp } = await loadAndroidConfig();
     expect(exp.extra.eas.projectId).toBe("11111111-2222-4333-8444-555555555555");
     expect(exp.owner).toBeUndefined();
   }, 30_000);
@@ -67,9 +73,9 @@ describe("Android app config", () => {
   it("allows increasing the revision without changing the upstream version", async () => {
     process.env.APP_VARIANT = "latex";
     process.env.PASEO_LATEX_REVISION = "1";
-    const first = await getPrebuildConfigAsync(__dirname, { platforms: ["android"] });
+    const first = await loadAndroidConfig();
     process.env.PASEO_LATEX_REVISION = "2";
-    const second = await getPrebuildConfigAsync(__dirname, { platforms: ["android"] });
+    const second = await loadAndroidConfig();
     expect(second.exp.android.versionCode).toBe(first.exp.android.versionCode + 1);
     expect(second.exp.version).toBe(first.exp.version);
   }, 30_000);
@@ -77,14 +83,14 @@ describe("Android app config", () => {
   it("rejects an invalid LaTeX build revision", async () => {
     process.env.APP_VARIANT = "latex";
     process.env.PASEO_LATEX_REVISION = "100";
-    await expect(getPrebuildConfigAsync(__dirname, { platforms: ["android"] })).rejects.toThrow(
+    await expect(loadAndroidConfig()).rejects.toThrow(
       "PASEO_LATEX_REVISION must be an integer from 1 through 99",
     );
   }, 30_000);
 
   it("preserves the official production app identity", async () => {
     process.env.APP_VARIANT = "production";
-    const { exp } = await getPrebuildConfigAsync(__dirname, { platforms: ["android"] });
+    const { exp } = await loadAndroidConfig();
     expect(exp.name).toBe("Paseo");
     expect(exp.android.package).toBe("sh.paseo");
     expect(exp.owner).toBe("getpaseo");

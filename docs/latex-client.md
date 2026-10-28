@@ -280,7 +280,7 @@ renderer. Rebuild the renderer whenever app source changes.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.13.0
+npm run latex:update -- --ref v0.13.2
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,
