@@ -6,14 +6,18 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      android:
+        description: Build the signed personal Android ARM64 APK
+        type: boolean
+        default: false
       windows:
         description: Build the independent Windows x64 installer
         type: boolean
         default: false
       revision:
-        description: Personal Windows build revision (1 through 99)
+        description: Personal build revision (1 through 99)
         type: string
-        default: "4"
+        default: "1"
 
 permissions:
   contents: read
@@ -89,6 +93,78 @@ jobs:
           path: artifacts/latex-source-format.patch
           if-no-files-found: ignore
           retention-days: 7
+
+  android:
+    if: github.repository == 'TwiceDrop/paseo-latex' && github.event_name == 'workflow_dispatch' && inputs.android
+    needs: source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore existing personal Android signing
+        env:
+          PASEO_LATEX_SIGNING_DIR: ${{ runner.temp }}/paseo-latex-signing
+          PASEO_LATEX_KEYSTORE_BASE64: ${{ secrets.PASEO_LATEX_KEYSTORE_BASE64 }}
+          PASEO_LATEX_CREDENTIALS_JSON: ${{ secrets.PASEO_LATEX_CREDENTIALS_JSON }}
+        shell: bash
+        run: |
+          printf 'PASEO_LATEX_SIGNING_DIR=%s\n' "$PASEO_LATEX_SIGNING_DIR" >> "$GITHUB_ENV"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const { PASEO_LATEX_SIGNING_DIR: directory, PASEO_LATEX_KEYSTORE_BASE64: keystore, PASEO_LATEX_CREDENTIALS_JSON: credentials } = process.env;
+          if (!keystore || !credentials) {
+            throw new Error('Configure PASEO_LATEX_KEYSTORE_BASE64 and PASEO_LATEX_CREDENTIALS_JSON from the existing personal signing files. Do not generate a new key.');
+          }
+          let parsed;
+          try {
+            parsed = JSON.parse(credentials);
+          } catch {
+            throw new Error('The existing personal signing credentials must be valid JSON.');
+          }
+          if (parsed.alias !== 'paseo-latex' || typeof parsed.password !== 'string' || parsed.password.length < 24) {
+            throw new Error('The existing personal signing credentials are invalid.');
+          }
+          fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+          fs.writeFileSync(path.join(directory, 'release.keystore'), Buffer.from(keystore, 'base64'), { mode: 0o600 });
+          fs.writeFileSync(path.join(directory, 'credentials.json'), credentials, { mode: 0o600 });
+          JS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - name: Install locked dependencies and personal patches
+        run: |
+          node scripts/npm-retry.mjs ci --ignore-scripts --no-audit --no-fund
+          npm run postinstall
+      - name: Build signed personal Android ARM64 APK
+        env:
+          PASEO_LATEX_BUILD_REVISION: ${{ inputs.revision }}
+        run: npm run android:latex -- --arch arm64-v8a --low-memory --revision "$PASEO_LATEX_BUILD_REVISION"
+      - name: Verify APK signing and personal identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=(artifacts/paseo-latex-*-r*.apk)
+          test "${#apk[@]}" -eq 1
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          "$apksigner" verify --verbose --print-certs "${apk[0]}"
+          test "$(apkanalyzer manifest application-id "${apk[0]}")" = "sh.paseo.latex"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paseo-latex-android-${{ github.sha }}
+          path: artifacts/paseo-latex-*-r*.apk
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove restored signing files
+        if: ${{ always() }}
+        shell: bash
+        run: rm -rf -- "$RUNNER_TEMP/paseo-latex-signing"
 
   windows:
     if: github.repository == 'TwiceDrop/paseo-latex' && github.event_name == 'workflow_dispatch' && inputs.windows

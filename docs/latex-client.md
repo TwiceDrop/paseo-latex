@@ -42,6 +42,16 @@ For the independent Windows installer, use a Windows machine and
 with its Windows option enabled. Linux cloud environments cannot directly run
 the Windows-only installer script. Increase the revision after each delivery.
 
+**LaTeX Source Build** can also build the personal Android ARM64 APK when its
+Android option is enabled. Set the repository Actions secrets
+`PASEO_LATEX_KEYSTORE_BASE64` to the base64-encoded existing `release.keystore`
+and `PASEO_LATEX_CREDENTIALS_JSON` to the existing `credentials.json`. Keep these
+values in GitHub Secrets, outside source and build artifacts. The job restores
+the original signing files in the runner's temporary directory, verifies the
+signed APK and its `sh.paseo.latex` identity, then removes the signing files.
+Both build options share the revision input; a new upstream version starts at 1.
+Successful builds are available as Actions artifacts; they do not create a release.
+
 For Android, install JDK 21, the Android SDK/NDK required by Expo 57 / RN 0.86,
 and restore the **existing** personal signing directory outside the checkout.
 Set `PASEO_LATEX_SIGNING_DIR` to that directory when it is not the default sibling
