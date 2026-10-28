@@ -155,6 +155,7 @@ jobs:
         run: |
           node scripts/npm-retry.mjs ci --ignore-scripts --no-audit --no-fund
           npm run postinstall
+          npm rebuild @shopify/react-native-skia --foreground-scripts
       - name: Build signed personal Android ARM64 APK
         env:
           PASEO_LATEX_BUILD_REVISION: ${{ inputs.revision }}

@@ -63,6 +63,9 @@ Signing keys and credentials must never enter that branch.
 
 For Android, install JDK 21, the Android SDK/NDK required by Expo 57 / RN 0.86,
 and restore the **existing** personal signing directory outside the checkout.
+After installing dependencies with `--ignore-scripts`, run
+`npm rebuild @shopify/react-native-skia --foreground-scripts` to prepare its
+locked native libraries before building.
 Set `PASEO_LATEX_SIGNING_DIR` to that directory when it is not the default sibling
 path. Then run `npm run android:latex -- --arch arm64-v8a --low-memory`.
 The repository deliberately contains no release private key or password. A cloud
