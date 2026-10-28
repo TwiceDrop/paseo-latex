@@ -302,10 +302,14 @@ jobs:
           apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
           apkanalyzer="$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/apkanalyzer' -type f | sort -V | tail -n 1)"
           "$apksigner" verify --print-certs "${apk[0]}" > certificate.txt
+          cat certificate.txt
           expected="$(node -pe "JSON.parse(require('fs').readFileSync('incoming/manifest.json')).certificateSha256")"
-          actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' certificate.txt)"
+          actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' certificate.txt | tr -d '\r' | tr 'A-F' 'a-f')"
+          printf 'Expected certificate SHA-256: %s\nActual certificate SHA-256: %s\n' "$expected" "$actual"
           test "$actual" = "$expected"
-          test "$("$apkanalyzer" manifest application-id "${apk[0]}")" = sh.paseo.latex
+          app_id="$("$apkanalyzer" manifest application-id "${apk[0]}")"
+          printf 'Application ID: %s\n' "$app_id"
+          test "$app_id" = sh.paseo.latex
       - name: Upload verified files and publish release
         shell: bash
         run: |
