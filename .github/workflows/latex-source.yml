@@ -151,6 +151,10 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: android-actions/setup-android@v3
+        with:
+          # Command-line tools 21.0; the legacy "tools" package is no longer published.
+          cmdline-tools-version: "15641748"
+          packages: "platform-tools"
       - name: Install locked dependencies and personal patches
         run: |
           node scripts/npm-retry.mjs ci --ignore-scripts --no-audit --no-fund
