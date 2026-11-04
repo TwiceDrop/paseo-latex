@@ -4,6 +4,8 @@ Keep the personal client on the `paseo-latex` branch. The `upstream` remote poin
 `https://github.com/getpaseo/paseo.git`. Merge upstream releases into this branch so
 the chat rendering and personal app identity remain in its history.
 
+Track requested changes in the [personal client backlog](latex-backlog.md).
+
 ## Build from a clean checkout
 
 The personal source repository is `https://github.com/TwiceDrop/paseo-latex.git`.

@@ -13,6 +13,92 @@ Use `npm ci --ignore-scripts`, `npm run postinstall`, then `npm run latex:prepar
 on a clean checkout. Signing keys and local `artifacts/` or `.dev/` files are not source dependencies.
 Keep this `AGENTS.md` symlink pointing to `CLAUDE.md`.
 
+While the user is collecting changes, record subsequent feedback in
+[docs/latex-backlog.md](docs/latex-backlog.md). Keep entries pending until the user
+asks to implement them. Distinguish user reports from reproduced findings.
+
+### Performance work
+
+Keep Electron on desktop and React Native / Expo / Hermes on Android for the first
+optimization pass. Reconsider a platform migration only after measuring a remaining
+platform bottleneck with equivalent features. Tauri would still need the desktop
+Node daemon and browser integration; changing the desktop shell does not optimize
+Android. Preserve the ability to merge upstream releases.
+
+The following are investigation and implementation priorities, not completed
+optimizations or measured device gains. Consult the linked subject docs before
+changing their behavior.
+
+**Desktop priorities:**
+
+- Separate document and Mermaid runtimes from the initial renderer bundle and load
+  them on demand from bundled local assets. Verify the exported dependency graph;
+  moving an import alone does not prove the startup payload became smaller.
+- Reduce document byte/base64/HTML duplication. Evaluate parser workers separately
+  from rendering, keeping the document isolation rules in [latex-client.md](docs/latex-client.md).
+- Measure retained workspaces and resident browser guests, then budget inactive
+  resources. Preserve unsaved edits, page state and running browser automation.
+  Include the daemon and guest processes when reporting memory.
+
+**Android priorities, in order:**
+
+1. **Establish startup and memory costs.** Profile initial imports, host/cache
+   hydration and the first usable chat. Investigate loading document/Mermaid assets
+   only when needed, and defer nonessential initialization without delaying visible
+   content. Inspect the actual Hermes bytecode and startup trace: Metro web chunking
+   and a native `import()` do not establish the same loading behavior. Keep the
+   startup restore contract in [expo-router.md](docs/expo-router.md).
+2. **Reduce streaming and history work.** Profile React updates, JS source adaptation
+   and native Markdown parsing/measurement separately, including long unbroken text,
+   formulas, code and tables. Preserve the existing stable-head/streaming-tail split,
+   row identity, virtualized history and bounded measurement cache described in
+   [agent-stream-performance.md](docs/agent-stream-performance.md) and
+   [markdown-renderer.md](docs/markdown-renderer.md). Tune reveal cadence and list
+   window/batch sizes only against device traces. Keep native math rendering,
+   complete text, cross-paragraph selection and scroll anchors; do not create a
+   WebView for each formula or truncate native replies to hide rendering cost.
+3. **Bound preview and image costs.** Investigate a local viewer asset plus a
+   separate data bridge instead of embedding every file as base64 in viewer HTML.
+   React Native WebView messaging is not the browser's transferable-ArrayBuffer API;
+   validate an Android-specific transport with the existing sandbox and offline
+   behavior. Evaluate PDF/spreadsheet parsing off the viewer thread, visible-only
+   Mermaid work, image decode sizing and byte-budgeted caches. Preserve document
+   limits, canvas caps and native streaming downloads in [latex-client.md](docs/latex-client.md).
+   Reclaim inactive viewer resources only with page/zoom/scroll restoration verified.
+4. **Reduce hidden work and battery use.** Audit timers, animations, polling, image
+   acquisition and terminal/diagram rendering against both app visibility and
+   retained-panel activity. Keep native workspace retention bounded. Follow
+   [mobile-panels.md](docs/mobile-panels.md): never apply the web `react-freeze` /
+   Suspense policy to retained native trees or move their keyed hosts to save memory.
+   Stabilize subscriptions instead, preserving shared transport, downloads and
+   foreground catch-up. Keep gesture motion on UI worklets; use
+   [terminal-performance.md](docs/terminal-performance.md) for output/backpressure changes.
+5. **Optimize packaging separately.** Inspect DEX, native libraries and Hermes
+   bytecode before experimenting with R8/resource shrinking or removing unused
+   native modules. The personal phone build already targets ARM64 when requested;
+   do not count another ABI reduction as a new gain. Validate keep rules and native
+   integrations, including math, Skia, document downloads and voice. APK size is not
+   runtime memory or frame latency.
+
+**Evidence for performance changes:** Use the same representative physical Android
+device, fixtures, host and network conditions before and after. Record the source
+commit, device/OS/WebView versions, refresh rate and build flags. Compare optimized
+ARM64 release builds; development builds and `--low-memory` builds (Hermes `-Og`)
+are different baselines. Use the existing profile/watchdog modes in
+[android.md](docs/android.md) with the personal `android:latex` build and package ID;
+confirm gains again with diagnostics disabled. Keep signing unchanged.
+
+Measure cold-start-to-interactive time, p95/p99 frame times and missed frames,
+JS stalls, peak/settled PSS including associated WebView processes, and background
+CPU/wakeups. Use Perfetto/system traces and `adb shell dumpsys meminfo sh.paseo.latex`;
+JS heap and React profiler timings alone miss native layout, graphics and WebViews.
+Exercise long formula-heavy streams while scrolling/typing, history pagination,
+large PDF/Office previews, repeated tab switches, keyboard/sidebar gestures and
+background/resume. Check memory recovery after closing previews. Reuse targeted
+flows from [mobile-testing.md](docs/mobile-testing.md) and the evidence rules in
+[qa.md](docs/qa.md). State explicitly when physical-device validation is unavailable;
+browser tests and Node microbenchmarks do not establish Android performance.
+
 ## Repository map
 
 This is an npm workspace monorepo:
@@ -74,6 +160,7 @@ At the start of non-trivial work, list `docs/` and skim anything relevant to the
 | [docs/browser-capture-harness.md](docs/browser-capture-harness.md)   | Real-Electron browser screenshot harness and compositor-surface gotcha                                                         |
 | [docs/android.md](docs/android.md)                                   | App variants, local/cloud builds, EAS workflows, version codes, F-Droid source builds and store metadata                       |
 | [docs/latex-client.md](docs/latex-client.md)                         | Personal LaTeX client identity, persistent APK signing and upstream merge workflow                                             |
+| [docs/latex-backlog.md](docs/latex-backlog.md)                       | User-reported pending changes for the personal client and their validation status                                              |
 | [docs/docker.md](docs/docker.md)                                     | Running the daemon and bundled web UI in Docker, volumes, agent images, security                                               |
 | [docs/release.md](docs/release.md)                                   | Release playbook, draft releases, completion checklist                                                                         |
 | [docs/terminal-activity.md](docs/terminal-activity.md)               | Terminal activity indicators — source-agnostic tracker, agent hook reporting, adding a new hook provider                       |
