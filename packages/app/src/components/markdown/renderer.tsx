@@ -6,6 +6,7 @@ import {
   useAssistantFileLinkEnvironment,
 } from "@/assistant-file-links";
 import { useStableEvent } from "@/hooks/use-stable-event";
+import { matchCommandLink, useAgentCommandHints, type CommandHints } from "@/agent-commands";
 import { AttachmentLightbox, type ImageLightboxSource } from "@/components/attachment-lightbox";
 import type { Theme } from "@/styles/theme";
 import { isWeb } from "@/constants/platform";
@@ -24,16 +25,32 @@ const ThemedMarkdown = withUnistyles(EnrichedMarkdownText);
 const MD4C_FLAGS = { latexMath: true, hardSoftBreaks: true, admonitions: true };
 
 // Reading the breakpoint here makes Unistyles restyle the text when the layout crosses it.
-const markdownStyle = (compact: boolean) => (theme: Theme, rt: { breakpoint?: string }) =>
-  createMarkdownStyles(theme, { compact, blockGap: resolveDensity(rt, density.blockGap) });
+const markdownStyle =
+  (compact: boolean, muted = false) =>
+  (theme: Theme, rt: { breakpoint?: string }) =>
+    createMarkdownStyles(theme, {
+      compact,
+      muted,
+      blockGap: resolveDensity(rt, density.blockGap),
+    });
 const regularStyle = markdownStyle(false);
 const compactStyle = markdownStyle(true);
+const compactMutedStyle = markdownStyle(true, true);
+
+function pickMarkdownStyle(compact: boolean, muted: boolean) {
+  if (!compact) return regularStyle;
+  return muted ? compactMutedStyle : compactStyle;
+}
 
 export interface MarkdownRendererProps extends MarkdownImageContext {
   text: string;
   compact?: boolean;
+  /** Muted text colour. Compact surfaces only. */
+  muted?: boolean;
+  selectable?: boolean;
   streaming?: boolean;
   onLinkPress?: (url: string) => unknown;
+  agentCommands?: boolean;
 }
 
 /** All Markdown surfaces share the same engine and source adaptation. */
@@ -49,22 +66,32 @@ export const MarkdownRenderer = memo(function MarkdownRenderer(props: MarkdownRe
       ),
     [completeLines],
   );
-  if (!streaming || boundary === 0) return <MarkdownPart {...props} />;
+  const Part = props.agentCommands ? CommandMarkdownPart : MarkdownPart;
+  if (!streaming || boundary === 0) return <Part {...props} />;
   return (
     <MarkdownBlockStack>
-      <MarkdownPart {...props} text={props.text.slice(0, boundary)} />
-      <MarkdownPart {...props} text={props.text.slice(boundary)} />
+      <Part {...props} text={props.text.slice(0, boundary)} />
+      <Part {...props} text={props.text.slice(boundary)} />
     </MarkdownBlockStack>
   );
+});
+
+const CommandMarkdownPart = memo(function CommandMarkdownPart(props: MarkdownRendererProps) {
+  const commandHints = useAgentCommandHints();
+  return <MarkdownPart {...props} commandHints={commandHints} />;
 });
 
 const MarkdownPart = memo(function MarkdownPart({
   text,
   compact = false,
+  muted = false,
+  selectable = true,
   streaming = false,
   onLinkPress,
+  agentCommands: _agentCommands,
+  commandHints = null,
   ...imageContext
-}: MarkdownRendererProps) {
+}: MarkdownRendererProps & { commandHints?: CommandHints | null }) {
   const environment = useAssistantFileLinkEnvironment();
   const mathSource = useMemo(() => prepareMathSource(text, streaming), [text, streaming]);
   const actions = useAssistantFileLinkActions();
@@ -78,18 +105,27 @@ const MarkdownPart = memo(function MarkdownPart({
     imageSources,
     linkRecognition,
     linkSource,
-  } = useMarkdownSource(mathSource.source, {
-    workspaceRoot: environment.workspaceRoot,
-    serverId: environment.serverId,
-    ...imageContext,
-    client,
-  });
+  } = useMarkdownSource(
+    mathSource.source,
+    {
+      workspaceRoot: environment.workspaceRoot,
+      serverId: environment.serverId,
+      ...imageContext,
+      client,
+    },
+    commandHints?.names,
+  );
   const markdown = useMemo(
     () => mathSource.restore(preparedMarkdown),
     [mathSource, preparedMarkdown],
   );
   const [image, setImage] = useState<ImageLightboxSource | null>(null);
   const pressLink = useStableEvent(({ url, sourceType }: LinkPressEvent) => {
+    const command = commandHints && matchCommandLink(url, sourceType, commandHints.names);
+    if (command) {
+      commandHints.insert(command);
+      return;
+    }
     const source = linkSource(url, sourceType);
     if (onLinkPress && !actions.canResolveFile(source)) onLinkPress(url);
     else actions.open(source, "preferred");
@@ -113,9 +149,9 @@ const MarkdownPart = memo(function MarkdownPart({
             <ThemedMarkdown
               key={`${segment.kind}:${segment.id}`}
               markdown={segment.source}
-              uniProps={compact ? compactStyle : regularStyle}
+              uniProps={pickMarkdownStyle(compact, muted)}
               flavor="github"
-              selectable
+              selectable={selectable}
               md4cFlags={MD4C_FLAGS}
               linkRecognition={linkRecognition}
               enableTaskListItemToggle={false}

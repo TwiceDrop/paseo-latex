@@ -10,7 +10,7 @@ Track requested changes in the [personal client backlog](latex-backlog.md).
 
 The personal source repository is `https://github.com/TwiceDrop/paseo-latex.git`.
 Its default `main` branch includes the personal patches; `paseo-latex` is the
-maintenance branch. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
+maintenance branch, based on upstream `v0.15.0`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
 build machines also need the native compiler prerequisites required by the target.
 
 ```sh
@@ -304,7 +304,7 @@ renderer. Rebuild the renderer whenever app source changes.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.13.2
+npm run latex:update -- --ref v0.15.0
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,

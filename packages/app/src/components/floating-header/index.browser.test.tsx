@@ -3,7 +3,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { Pressable, Text, View } from "react-native";
 import { afterEach, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
-import { FloatingHeaderLayout } from ".";
+import { PortalProvider } from "@gorhom/portal";
+import { FloatingHeaderLayout, FloatingHeaderOverlay, useFloatingHeaderOverlayClearance } from ".";
 
 vi.stubGlobal("React", React);
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -16,6 +17,11 @@ const loadingStyle = {
   zIndex: 40,
   backgroundColor: "white",
 };
+const reconnectHeader = (
+  <View style={headerStyle}>
+    <Text>Workspace</Text>
+  </View>
+);
 
 let root: Root | undefined;
 let host: HTMLDivElement | undefined;
@@ -85,7 +91,13 @@ it("keeps navigation reachable above a pending chat overlay and preserves a late
   Object.assign(host.style, { width: "390px", height: "720px", display: "flex" });
   document.body.append(host);
   root = createRoot(host);
-  act(() => root?.render(<Screen />));
+  act(() =>
+    root?.render(
+      <PortalProvider>
+        <Screen />
+      </PortalProvider>,
+    ),
+  );
 
   const button = host.querySelector<HTMLElement>('[role="button"]')!;
   const bounds = button.getBoundingClientRect();
@@ -103,4 +115,55 @@ it("keeps navigation reachable above a pending chat overlay and preserves a late
   expect(host.querySelector('[data-testid="pending-chat-overlay"]')).toBe(null);
   expect(mounted).toHaveBeenCalledTimes(1);
   expect(unmounted).toHaveBeenCalledTimes(0);
+});
+
+it("positions a reconnect notice below the floating navigation header", async () => {
+  function Notice() {
+    const top = useFloatingHeaderOverlayClearance();
+    const noticeStyle = useMemo(
+      () => ({
+        position: "absolute" as const,
+        top,
+        left: 8,
+        height: 28,
+        backgroundColor: "#ff0000",
+      }),
+      [top],
+    );
+    return (
+      <FloatingHeaderOverlay>
+        <View testID="reconnect-notice" style={noticeStyle}>
+          <Text>Reconnecting</Text>
+        </View>
+      </FloatingHeaderOverlay>
+    );
+  }
+
+  host = document.createElement("div");
+  Object.assign(host.style, { width: "390px", height: "360px", display: "flex" });
+  document.body.append(host);
+  root = createRoot(host);
+  act(() =>
+    root?.render(
+      <PortalProvider>
+        <FloatingHeaderLayout floating header={reconnectHeader}>
+          {() => (
+            <>
+              <View style={contentStyle} />
+              <Notice />
+            </>
+          )}
+        </FloatingHeaderLayout>
+      </PortalProvider>,
+    ),
+  );
+  await expect
+    .poll(
+      () => host!.querySelector('[data-testid="reconnect-notice"]')?.getBoundingClientRect().top,
+    )
+    .toBeGreaterThanOrEqual(host.getBoundingClientRect().top + 80);
+  await expect.element(page.getByText("Reconnecting", { exact: true })).toBeVisible();
+  await page
+    .elementLocator(host)
+    .screenshot({ path: "../../../../../artifacts/latex-v0.15.0-header.png" });
 });

@@ -22,9 +22,10 @@ afterEach(() => {
   window.getSelection()?.removeAllRanges();
 });
 
-function mount(source: string) {
+function mount(source: string, commandNames?: ReadonlySet<string>) {
   const prepared = prepareMathSource(source);
-  const markdown = prepared.restore(prepareMarkdownSource(prepared.source).render());
+  const adapted = prepareMarkdownSource(prepared.source, undefined, { commandNames });
+  const markdown = prepared.restore(adapted.render());
   host = document.createElement("div");
   host.dataset.testid = "assistant-message";
   Object.assign(host.style, { width: "390px", padding: "16px", background: "#181b19" });
@@ -36,6 +37,7 @@ function mount(source: string) {
         markdown={markdown}
         flavor="github"
         md4cFlags={flags}
+        linkRecognition={adapted.linkRecognition}
         markdownStyle={markdownStyle}
         selectable
       />,
@@ -44,7 +46,7 @@ function mount(source: string) {
   return host;
 }
 
-it("renders inline and display formulas through the actual 0.12 Markdown engine", async () => {
+it("renders inline and display formulas through the actual Markdown engine", async () => {
   const container = mount(String.raw`中文行内公式 \(\frac{x_1^2}{2}\)，后面继续文字。
 
 \[
@@ -67,6 +69,21 @@ y, & 0\le y\le1,\\
   await page
     .elementLocator(container)
     .screenshot({ path: "../../../../../../artifacts/review-latex-web.png" });
+});
+
+it("recognizes agent commands while preserving command-like text inside formulas", async () => {
+  const container = mount(
+    "Run `/review:fast` after checking \\(\\text{/review:fast} + x_1^2\\).",
+    new Set(["review:fast"]),
+  );
+  await expect.poll(() => container.querySelectorAll('[role="math"] math').length).toBe(1);
+  expect(container.querySelector('[role="math"]')!.getAttribute("aria-label")).toBe(
+    String.raw`\text{/review:fast} + x_1^2`,
+  );
+  const links = container.querySelectorAll("a");
+  expect(links).toHaveLength(1);
+  expect(links[0].getAttribute("href")).toBe("/review:fast");
+  expect(links[0].textContent).toBe("/review:fast");
 });
 
 it("keeps currency, escaped dollars, inline code and fenced source literal", async () => {
