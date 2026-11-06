@@ -40,7 +40,7 @@ export function FileDownloadToolbar({
         {size === undefined ? null : <Text style={styles.size}>{formatFileSize(size)}</Text>}
         <Button
           variant="ghost"
-          size="xs"
+          size="sm"
           leftIcon={Download}
           onPress={onDownload}
           disabled={downloading}

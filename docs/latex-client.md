@@ -10,7 +10,7 @@ Track requested changes in the [personal client backlog](latex-backlog.md).
 
 The personal source repository is `https://github.com/TwiceDrop/paseo-latex.git`.
 Its default `main` branch includes the personal patches; `paseo-latex` is the
-maintenance branch, based on upstream `v0.15.0`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
+maintenance branch, based on upstream `v0.15.2`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
 build machines also need the native compiler prerequisites required by the target.
 
 ```sh
@@ -169,7 +169,15 @@ an install with `--ignore-scripts`; it does not download iOS frameworks.
 The vendor patch applies the engine's horizontal-block gesture handling to math
 as well as code and tables, so formula drags do not accidentally open sidebars.
 
-## Collapsed sidebar projects
+## Sidebar ordering and collapsed projects
+
+In project grouping, drag a chat row to change its order; on Android, hold the row
+briefly before moving it. A changed drop selects **Manual** sorting and saves the
+order on this device. Other displayed projects keep their current order, and
+hidden rows remain available through **Show more**. Cancelling a drag or dropping
+in the same position keeps the current sort. **Created** and **Last prompt** remain
+available in the sidebar's display preferences. Pinned chats and project headings
+keep their separate saved orders.
 
 Press a project heading to move the whole group into **Collapsed projects** above
 the sidebar footer. Press its name there to restore it in its previous order.
@@ -304,7 +312,7 @@ renderer. Rebuild the renderer whenever app source changes.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.15.0
+npm run latex:update -- --ref v0.15.2
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,

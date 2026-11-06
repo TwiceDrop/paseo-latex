@@ -83,6 +83,19 @@ jobs:
         run: npm exec -- playwright install --with-deps chromium
       - name: Run real document and math browser regression tests
         run: npm run test:browser --workspace=@getpaseo/app -- src/file-pane/document-preview/runtime.browser.test.ts src/components/markdown/math/enriched.browser.test.tsx --maxWorkers=1
+      - name: Run sidebar drag ordering regression tests
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          E2E_RECORD_VIDEO: "1"
+        run: npm run test:e2e --workspace=@getpaseo/app -- e2e/browser/sidebar-reorder.spec.ts --workers=1
+      - name: Upload sidebar regression evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: latex-sidebar-regressions-${{ github.sha }}
+          path: packages/app/test-results
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Compile the personal web client
         run: npm run latex:web
       - name: Check source formatting

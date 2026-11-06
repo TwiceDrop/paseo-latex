@@ -34,10 +34,7 @@ async function pressWorkspaceRow(rows: Locator) {
   await expect.poll(() => solidScrimStop.getAttribute("stop-color")).not.toBe(hoverScrimColor);
 }
 
-async function quickDragFirstRowAfterSecond(
-  rows: Locator,
-  pressRow: (rows: Locator) => Promise<void>,
-) {
+async function startSidebarDrag(rows: Locator, pressRow: (rows: Locator) => Promise<void>) {
   await expect(rows).toHaveCount(2);
   const before = await rowTestIds(rows);
   const sourceBox = await visibleBoundingBox(rows.nth(0));
@@ -52,6 +49,15 @@ async function quickDragFirstRowAfterSecond(
   await pressRow(rows);
   await page.mouse.move(source.x, source.y + 7);
   await expect(trailingScrim).toHaveCount(0);
+  return { before, source, target };
+}
+
+async function quickDragFirstRowAfterSecond(
+  rows: Locator,
+  pressRow: (rows: Locator) => Promise<void>,
+) {
+  const { before, target } = await startSidebarDrag(rows, pressRow);
+  const page = rows.page();
   await page.mouse.move(target.x, target.y, { steps: 4 });
   await finishSidebarDrag(page);
 
@@ -65,21 +71,7 @@ async function finishSidebarDrag(page: Page): Promise<void> {
   await page.waitForTimeout(60);
 }
 
-async function dragWithoutReordering(rows: Locator): Promise<void> {
-  const before = await rowTestIds(rows);
-  const source = await visibleBoundingBox(rows.nth(0));
-  const target = await visibleBoundingBox(rows.nth(1));
-  const page = rows.page();
-  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 5 });
-  await finishSidebarDrag(page);
-  await expect.poll(() => rowTestIds(rows)).toEqual(before);
-}
-
-test("projects and pinned chats reorder while ordinary workspaces stay newest first", async ({
-  page,
-}) => {
+test("projects, ordinary chats and pinned chats reorder and persist", async ({ page }) => {
   const firstProject = await seedWorkspace({ repoPrefix: "sidebar-reorder-first-" });
   const secondProject = await seedWorkspace({ repoPrefix: "sidebar-reorder-second-" });
 
@@ -113,7 +105,19 @@ test("projects and pinned chats reorder while ordinary workspaces stay newest fi
     await expect
       .poll(() => rowTestIds(ordinaryRows))
       .toEqual([secondWorkspaceTestId, firstWorkspaceTestId]);
-    await dragWithoutReordering(ordinaryRows);
+    await test.info().attach("sidebar-before-drag", {
+      body: await page.screenshot({ path: test.info().outputPath("sidebar-before-drag.png") }),
+      contentType: "image/png",
+    });
+    await quickDragFirstRowAfterSecond(ordinaryRows, pressWorkspaceRow);
+    await reconnectSidebar(page);
+    await expect
+      .poll(() => rowTestIds(ordinaryRows))
+      .toEqual([firstWorkspaceTestId, secondWorkspaceTestId]);
+    await test.info().attach("sidebar-after-drag-and-reload", {
+      body: await page.screenshot({ path: test.info().outputPath("sidebar-after-drag.png") }),
+      contentType: "image/png",
+    });
 
     await firstProject.client.setWorkspacePinned(firstProject.workspaceId, true);
     await secondProject.client.setWorkspacePinned(secondProject.workspaceId, true);
@@ -134,6 +138,12 @@ async function selectWorkspaceSort(page: Page, name: "Manual" | "Created" | "Las
   await page.getByLabel("Display preferences", { exact: true }).click();
   await page.getByRole("menuitem", { name: /^Sort/ }).click();
   await page.getByRole("menuitem", { name, exact: true }).click();
+}
+
+async function expectWorkspaceSort(page: Page, name: "Manual" | "Created" | "Last prompt") {
+  await page.getByLabel("Display preferences", { exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: /^Sort/ })).toContainText(name);
+  await page.keyboard.press("Escape");
 }
 
 async function reconnectSidebar(page: Page): Promise<void> {
@@ -197,6 +207,12 @@ test("Created stays stable, Last prompt follows human submissions and survives t
     await reconnectSidebar(page);
     await expect.poll(() => rowTestIds(rows)).toEqual([oldId, newId]);
     await selectWorkspaceSort(page, "Created");
+    await expect.poll(() => rowTestIds(rows)).toEqual([newId, oldId]);
+    await selectWorkspaceSort(page, "Last prompt");
+    await expect.poll(() => rowTestIds(rows)).toEqual([oldId, newId]);
+    await quickDragFirstRowAfterSecond(rows, pressWorkspaceRow);
+    await expectWorkspaceSort(page, "Manual");
+    await reconnectSidebar(page);
     await expect.poll(() => rowTestIds(rows)).toEqual([newId, oldId]);
     await selectSidebarStatusGrouping(page);
     await expectNoWorkspaceSortChoice(page);
@@ -284,7 +300,11 @@ async function expectRevealSurvivesSortingAndCollapse(
   }
   await project.click();
   await expect(rows).toHaveCount(0);
-  await project.click();
+  await page
+    .getByTestId(`sidebar-collapsed-project-${projectEquivalenceViewKey(seed.projectKey)}`)
+    .click();
+  await expectWorkspaceOrder(rows, ids.slice(0, 7));
+  await revealWorkspaces(group, "Show more");
   await expectWorkspaceOrder(rows, ids);
   await seed.client.sendAgentMessage(agent.id, "expanded overflow");
   await seed.client.waitForFinish(agent.id, 15_000);
@@ -432,6 +452,102 @@ function workspaceRows(page: Page, ids: string[]) {
     ids.map((id) => `[data-testid="sidebar-workspace-row-${getServerId()}:${id}"]`).join(", "),
   );
 }
+
+test("an automatic-sort drag preserves hidden rows and other projects; unchanged drops keep the sort", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const { seed, ids } = await seedCompactProject();
+  const other = await seedWorkspace({ repoPrefix: "sidebar-other-project-" });
+  try {
+    const newer = await other.client.createWorkspace({
+      source: { kind: "directory", path: other.repoPath, projectId: other.projectId },
+      title: "Other newer workspace",
+    });
+    if (!newer.workspace) throw new Error(newer.error ?? "Workspace creation failed");
+    const otherIds = [other.workspaceId, newer.workspace.id];
+    await gotoAppShell(page);
+    await waitForSidebarHydration(page);
+    await restorePreBetaOrder(
+      page,
+      projectEquivalenceViewKey(other.projectKey),
+      otherIds.map((id) => `${getServerId()}:${id}`),
+    );
+    const otherRows = workspaceRows(page, otherIds);
+    await expectWorkspaceOrder(otherRows, otherIds.toReversed());
+    const rows = workspaceRows(page, ids);
+    await expectWorkspaceOrder(rows, ids.slice(0, 7));
+    const draggedRows = workspaceRows(page, ids.slice(0, 2));
+
+    await startSidebarDrag(draggedRows, pressWorkspaceRow);
+    await finishSidebarDrag(page);
+    await expectWorkspaceSort(page, "Created");
+    const { target } = await startSidebarDrag(draggedRows, pressWorkspaceRow);
+    await page.mouse.move(target.x, target.y, { steps: 4 });
+    await page.keyboard.press("Escape");
+    await finishSidebarDrag(page);
+    await expectWorkspaceSort(page, "Created");
+    await expectWorkspaceOrder(rows, ids.slice(0, 7));
+
+    await quickDragFirstRowAfterSecond(draggedRows, pressWorkspaceRow);
+    await expectWorkspaceSort(page, "Manual");
+    await expectWorkspaceOrder(otherRows, otherIds.toReversed());
+    await reconnectSidebar(page);
+    await expectWorkspaceOrder(rows, [ids[1]!, ids[0]!, ...ids.slice(2, 7)]);
+    await expectWorkspaceOrder(otherRows, otherIds.toReversed());
+    await page
+      .getByTestId(`sidebar-project-show-more-${projectEquivalenceViewKey(seed.projectKey)}`)
+      .click();
+    await expectWorkspaceOrder(rows, [ids[1]!, ids[0]!, ...ids.slice(2)]);
+  } finally {
+    await seed.cleanup();
+    await other.cleanup();
+  }
+});
+
+test.describe("touch sidebar ordering", () => {
+  test.use({ hasTouch: true });
+
+  test("holding and dragging an ordinary chat saves its order", async ({ page }) => {
+    const seed = await seedWorkspace({ repoPrefix: "sidebar-touch-order-" });
+    try {
+      const newer = await seed.client.createWorkspace({
+        source: { kind: "directory", path: seed.repoPath, projectId: seed.projectId },
+        title: "New touch workspace",
+      });
+      if (!newer.workspace) throw new Error(newer.error ?? "Workspace creation failed");
+      await gotoAppShell(page);
+      await waitForSidebarHydration(page);
+      const ids = [newer.workspace.id, seed.workspaceId];
+      const rows = workspaceRows(page, ids);
+      await expectWorkspaceOrder(rows, ids);
+      const source = await visibleBoundingBox(rows.nth(0));
+      const target = await visibleBoundingBox(rows.nth(1));
+      const x = source.x + source.width / 2;
+      const startY = source.y + source.height / 2;
+      const endY = target.y + target.height / 2;
+      const input = await page.context().newCDPSession(page);
+      await input.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x, y: startY }],
+      });
+      await expect(rows.nth(0).getByTestId("sidebar-workspace-trailing-scrim")).toHaveCount(0);
+      for (let step = 1; step <= 4; step += 1) {
+        await input.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x, y: startY + ((endY - startY) * step) / 4 }],
+        });
+      }
+      await input.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await input.detach();
+      await expectWorkspaceOrder(rows, ids.toReversed());
+      await reconnectSidebar(page);
+      await expectWorkspaceOrder(rows, ids.toReversed());
+    } finally {
+      await seed.cleanup();
+    }
+  });
+});
 
 async function openWorkspaceRow(page: Page, workspaceId: string) {
   await page.getByTestId(`sidebar-workspace-row-${getServerId()}:${workspaceId}`).click();
