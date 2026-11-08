@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { runWithRetry } from "../npm-retry.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 if (process.platform !== "win32") throw new Error("Run this installer build on Windows.");
@@ -80,7 +81,7 @@ if (!resume) {
 if (!packageOnly)
   await run(["exec", "--", "expo", "export", "--platform", "web"], path.join(root, "packages/app"));
 await run(["run", "build:main", "--workspace=@getpaseo/desktop"]);
-await run(
+const packagingExitCode = await runWithRetry(
   [
     "exec",
     "--",
@@ -92,6 +93,21 @@ await run(
     "--publish",
     "never",
   ],
-  path.join(root, "packages/desktop"),
+  {
+    // Electron and NSIS tools are downloaded during packaging. Keep successful
+    // downloads in this runner's cache and retry without recompiling the app.
+    attempts: 5,
+    backoffMs: 10_000,
+    run: async (args) => {
+      try {
+        await run(args, path.join(root, "packages/desktop"));
+        return 0;
+      } catch (error) {
+        console.error(error);
+        return 1;
+      }
+    },
+  },
 );
+if (packagingExitCode !== 0) process.exit(packagingExitCode);
 console.log(`\nInstaller: ${installer}`);
