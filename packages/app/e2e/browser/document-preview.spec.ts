@@ -72,9 +72,15 @@ test("previews local Office, PDF and text documents over the workspace connectio
   test.setTimeout(180_000);
   const workspace = await withWorkspace({ prefix: "document-preview-" });
   const fixtures = await documentFixtures();
+  const runtimeRequests: string[] = [];
+  page.on("request", (request) => {
+    const kind = /document-(word|slides|sheet|pdf|text|legacy)\.gen\.html/.exec(request.url())?.[1];
+    if (kind) runtimeRequests.push(kind);
+  });
   for (const [name, bytes] of Object.entries(fixtures))
     await writeFile(path.join(workspace.repoPath, name), bytes);
   await page.goto(buildHostWorkspaceRoute(getServerId(), workspace.workspaceId));
+  expect(runtimeRequests).toEqual([]);
   async function open(name: string) {
     await openFileExplorer(page);
     await openFileFromExplorer(page, name);
@@ -84,6 +90,7 @@ test("previews local Office, PDF and text documents over the workspace connectio
     const viewer = await open("preview.docx");
     await expect(viewer.getByText("Word 预览验证", { exact: true })).toBeVisible();
     await expect(viewer.locator("td").getByText("128.50", { exact: true })).toBeVisible();
+    expect(runtimeRequests).toEqual(["word"]);
     const pageSection = viewer.locator("section.docx").first();
     const before = await pageSection.boundingBox();
     await viewer.getByRole("button", { name: "Zoom in", exact: true }).click();
@@ -167,4 +174,40 @@ test("previews local Office, PDF and text documents over the workspace connectio
         .evaluate((canvas) => (canvas as HTMLCanvasElement).width),
     ).toBeGreaterThan(0);
   });
+  expect([...new Set(runtimeRequests)].sort()).toEqual(["pdf", "sheet", "slides", "text", "word"]);
+});
+
+test("retries an unavailable preview runtime without rereading the document", async ({
+  page,
+  withWorkspace,
+}) => {
+  const workspace = await withWorkspace({ prefix: "document-runtime-retry-" });
+  await writeFile(path.join(workspace.repoPath, "preview.log"), "Offline document 预览");
+  let reads = 0;
+  page.on("websocket", (socket) =>
+    socket.on("framesent", ({ payload }) => {
+      const message = String(payload);
+      if (
+        message.includes('"file_explorer_request"') &&
+        message.includes('"mode":"file"') &&
+        message.includes("preview.log")
+      )
+        reads++;
+    }),
+  );
+  // Fail only the bundled resource transport; the browser, daemon and file read remain real.
+  const runtimeUrl = /document-text\.gen\.html/;
+  await page.route(runtimeUrl, (route) => route.abort("failed"));
+  await page.goto(buildHostWorkspaceRoute(getServerId(), workspace.workspaceId));
+  await openFileExplorer(page);
+  await openFileFromExplorer(page, "preview.log");
+  const error = page.getByTestId("document-preview-error").filter({ visible: true });
+  await expect(error.getByText("Failed to load file preview", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("file-panel-download").filter({ visible: true })).toBeEnabled();
+  await expect.poll(() => reads).toBe(1);
+  await page.unroute(runtimeUrl);
+  await error.getByRole("button", { name: "Retry", exact: true }).click();
+  const viewer = page.frameLocator('[data-testid="document-preview"]:visible');
+  await expect(viewer.locator("pre")).toHaveText("Offline document 预览");
+  expect(reads).toBe(1);
 });

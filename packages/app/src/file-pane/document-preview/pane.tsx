@@ -11,6 +11,7 @@ import { useAppActivelyVisible } from "@/hooks/use-app-visible";
 import { useSessionStore } from "@/stores/session-store";
 import { resolveFilePreviewReadTarget } from "@/file-explorer/preview-target";
 import { documentPreviewHtml } from "./html";
+import { loadDocumentRuntime } from "./load-runtime";
 import { readPreviewDocument, shareDocumentBytes, type DocumentKind } from "./model";
 import { DocumentSurface } from "./surface";
 
@@ -54,13 +55,25 @@ export function DocumentPane({
     retry: false,
     gcTime: 0,
   });
+  const runtime = useFetchQuery({
+    queryKey: ["document-preview-runtime", kind],
+    queryFn: () => loadDocumentRuntime(kind),
+    enabled: !!client && !!target && active && visible,
+    dataShape: "value",
+    immutableWhen: () => true,
+    retry: false,
+    // Retained panes share their parser; closing the last pane releases its HTML.
+    gcTime: 0,
+  });
   const retry = useCallback(() => {
-    void query.refetch();
-  }, [query]);
+    if (runtime.error) void runtime.refetch();
+    if (!runtime.error || query.error) void query.refetch();
+  }, [query, runtime]);
   const html = useMemo(
     () =>
-      query.data
+      query.data && runtime.data
         ? documentPreviewHtml({
+            runtimeHtml: runtime.data,
             bytes: query.data,
             kind,
             labels: {
@@ -78,7 +91,7 @@ export function DocumentPane({
             },
           })
         : null,
-    [kind, query.data, t],
+    [kind, query.data, runtime.data, t],
   );
   let message: string | null = null;
   if (!client) message = t("workspace.terminal.hostDisconnected");
@@ -88,12 +101,18 @@ export function DocumentPane({
       query.error.message === "File is too large to display"
         ? t("panels.file.document.tooLarge")
         : query.error.message;
+  else if (runtime.error) message = t("panels.file.failedToLoadPreview");
   let content;
   if (message)
     content = (
       <View style={styles.center} testID="document-preview-error">
         <Text style={styles.error}>{message}</Text>
-        <Button variant="outline" size="sm" onPress={retry} loading={query.isFetching}>
+        <Button
+          variant="outline"
+          size="sm"
+          onPress={retry}
+          loading={query.isFetching || runtime.isFetching}
+        >
           {t("common.actions.retry")}
         </Button>
       </View>

@@ -2,6 +2,12 @@ import { afterEach, expect, it } from "vitest";
 import { documentPreviewHtml } from "./html";
 import type { DocumentKind } from "./model";
 import type { DocumentLabels } from "./messages";
+import wordRuntime from "./runtime/document-word.gen.html?raw";
+import slidesRuntime from "./runtime/document-slides.gen.html?raw";
+import sheetRuntime from "./runtime/document-sheet.gen.html?raw";
+import pdfRuntime from "./runtime/document-pdf.gen.html?raw";
+import textRuntime from "./runtime/document-text.gen.html?raw";
+import legacyRuntime from "./runtime/document-legacy.gen.html?raw";
 import {
   addSlide,
   addSlideTextBox,
@@ -23,6 +29,14 @@ const labels: DocumentLabels = {
   sheet: "Sheet",
   limitedColumns: "First 200 columns",
   legacy: "Convert first",
+};
+const runtimes: Record<DocumentKind, string> = {
+  word: wordRuntime,
+  slides: slidesRuntime,
+  sheet: sheetRuntime,
+  pdf: pdfRuntime,
+  text: textRuntime,
+  legacy: legacyRuntime,
 };
 let frame: HTMLIFrameElement | undefined;
 afterEach(() => {
@@ -47,6 +61,7 @@ async function preview(kind: DocumentKind, source: string | Uint8Array) {
     }
   </script>`;
   frame.srcdoc = documentPreviewHtml({
+    runtimeHtml: runtimes[kind],
     kind,
     bytes: typeof source === "string" ? new TextEncoder().encode(source) : source,
     labels,
@@ -57,6 +72,20 @@ async function preview(kind: DocumentKind, source: string | Uint8Array) {
     .toBe("ready");
   return frame.contentDocument!;
 }
+
+it("keeps a text preview below 16 KiB without loading Office or PDF parsers", async () => {
+  const source = "Plain text 中文\n<not-an-html-element>";
+  const html = documentPreviewHtml({
+    runtimeHtml: textRuntime,
+    kind: "text",
+    bytes: new TextEncoder().encode(source),
+    labels,
+  });
+  expect(new TextEncoder().encode(html).byteLength).toBeLessThan(16 * 1024);
+  const doc = await preview("text", source);
+  expect(doc.querySelector("pre")?.textContent).toBe(source);
+  expect(doc.querySelector("not-an-html-element")).toBeNull();
+});
 
 it("paginates wide sheets within a small cell budget without losing rows", async () => {
   const csv = Array.from({ length: 205 }, (_row, r) =>

@@ -10,7 +10,7 @@ Track requested changes in the [personal client backlog](latex-backlog.md).
 
 The personal source repository is `https://github.com/TwiceDrop/paseo-latex.git`.
 Its default `main` branch includes the personal patches; `paseo-latex` is the
-maintenance branch, based on upstream `v0.15.2`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
+maintenance branch, based on upstream `v0.15.3`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
 build machines also need the native compiler prerequisites required by the target.
 
 ```sh
@@ -127,8 +127,13 @@ Plugin file panels remain selectable. The file tab's download action is availabl
 even when a file has no preview or a plugin supplies its panel.
 
 The document viewer reads at most 32 MB over the existing authenticated session.
-It runs in an isolated iframe or native WebView with its parsers, PDF CMaps and
-standard fonts bundled locally. It does not upload documents to an Office service.
+Its parsers are separate local HTML assets for Word, slides, spreadsheets, PDF,
+text and legacy-format notices. Opening a visible preview loads only that format;
+the full parser HTML stays out of the startup JavaScript and Hermes bytecode.
+PDF CMaps, standard fonts and WASM remain bundled with the PDF viewer for offline use.
+The viewer runs in an isolated iframe or native WebView. Native assets are read
+through Expo Asset and FileSystem before using the existing `about:blank` HTML
+source; WebView file access stays disabled. No document goes to an Office service.
 Old binary DOC/PPT documents must be saved as DOCX/PPTX or downloaded to open in
 Office. Excel previews show cached values; they do not calculate formulas or
 render embedded charts, and show at most 200 columns. Complex Office layout can
@@ -137,7 +142,10 @@ differ from the desktop applications.
 Retained document panes reuse the fetched bytes for 30 seconds during rapid tab
 or workspace switches. Reopening a pane revalidates immediately; returning after
 30 seconds also revalidates. An unchanged response retains the existing byte array,
-so revalidation does not rebuild the viewer HTML. Hidden panes do not initiate reads. Native workspace
+so revalidation does not rebuild the viewer HTML. Retained previews of the same
+format share their loaded parser; closing the last preview releases its HTML from
+the query cache. A parser-load failure keeps Retry and Download available; Retry
+does not transfer an already loaded document again. Hidden panes do not initiate reads. Native workspace
 retention remains limited to one workspace to bound memory and preserve Fabric
 ownership. PDF backing canvases are capped at 4,194,304 pixels and 8,192 pixels per
 side (about 16 MiB of RGBA storage); CSS zoom remains available, with reduced
@@ -150,8 +158,11 @@ the rendered SVG. PDF resizing waits for the active render to finish before usin
 the same canvas again.
 
 After changing the viewer runtime or parser dependencies, run
-`npm run build:document-preview --workspace=@getpaseo/app`. The generated viewer
-is checked in, and `android:latex` rebuilds it before packaging. Keep the ZIP
+`npm run build:document-preview --workspace=@getpaseo/app`. The generated HTML
+assets and their small Metro registry are checked in, and `android:latex` rebuilds
+them before packaging. Do not import the HTML contents into app JavaScript;
+verify the production web export and Hermes bytecode when changing asset loading.
+Keep the ZIP
 expansion and byte-count limits at the file boundary. Disable DOCX altChunks and
 keep frame navigation and external resources blocked; document content must not
 gain access to the app or its host credentials.
@@ -312,7 +323,7 @@ renderer. Rebuild the renderer whenever app source changes.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.15.2
+npm run latex:update -- --ref v0.15.3
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,

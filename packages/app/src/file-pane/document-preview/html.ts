@@ -1,9 +1,9 @@
 import { Buffer } from "buffer";
 import type { DocumentKind } from "./model";
 import type { DocumentLabels, DocumentRequest } from "./messages";
-import { documentRuntimeHtml } from "./runtime/html.gen";
 
 export function documentPreviewHtml(input: {
+  runtimeHtml: string;
   bytes: Uint8Array;
   kind: DocumentKind;
   labels: DocumentLabels;
@@ -18,7 +18,7 @@ export function documentPreviewHtml(input: {
     labels: input.labels,
   };
   const json = JSON.stringify(request).replace(/</g, "\\u003c");
-  return documentRuntimeHtml.replace(
+  return input.runtimeHtml.replace(
     "/*PASEO_DOCUMENT_REQUEST*/",
     () => `window.__paseoDocument=${json};`,
   );
