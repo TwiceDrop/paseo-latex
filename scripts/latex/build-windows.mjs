@@ -4,6 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { runWithRetry } from "../npm-retry.mjs";
+import { prepareWindowsTools } from "./windows-tools.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 if (process.platform !== "win32") throw new Error("Run this installer build on Windows.");
@@ -22,6 +23,7 @@ if (!Number.isInteger(revision) || revision < 1 || revision > 99)
   throw new Error("Invalid Windows revision");
 const output = path.join(root, `artifacts/windows-latex-${version}-r${revision}`);
 const installer = path.join(output, `Paseo-LaTeX-Setup-${version}-r${revision}-x64.exe`);
+const toolsDirectory = path.join(root, ".dev/windows-latex-tools");
 if (fs.existsSync(installer))
   throw new Error(`Keep the delivered installer; use a new revision: ${installer}`);
 const env = {
@@ -33,6 +35,7 @@ const env = {
   EXPO_NO_TELEMETRY: "1",
   CSC_IDENTITY_AUTO_DISCOVERY: "false",
   PASEO_LATEX_WINDOWS_REVISION: String(revision),
+  ...(process.env.GH_TOKEN ? { ELECTRON_BUILDER_CACHE: path.join(toolsDirectory, "cache") } : {}),
 };
 const npm = process.env.npm_execpath;
 if (!npm) throw new Error("Run with npm run windows:latex.");
@@ -73,6 +76,9 @@ async function run(args, cwd = root) {
   });
 }
 // Each compiler has its own bounded process, and only one runs at a time.
+const electronDist = process.env.GH_TOKEN
+  ? await prepareWindowsTools({ directory: toolsDirectory, cache: env.ELECTRON_BUILDER_CACHE })
+  : undefined;
 if (!resume) {
   for (const workspace of ["highlight", "client", "plugin", "expo-two-way-audio", "server", "cli"])
     await run(["run", "build", `--workspace=@getpaseo/${workspace}`]);
@@ -88,6 +94,7 @@ const packagingExitCode = await runWithRetry(
     "electron-builder",
     "--config",
     "electron-builder.latex.cjs",
+    ...(electronDist ? [`--config.electronDist=${electronDist}`] : []),
     "--win",
     "--x64",
     "--publish",

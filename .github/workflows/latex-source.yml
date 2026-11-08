@@ -215,6 +215,7 @@ jobs:
       - name: Build independent Windows installer
         env:
           PASEO_LATEX_BUILD_REVISION: ${{ inputs.revision }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run windows:latex -- --revision $env:PASEO_LATEX_BUILD_REVISION
       - uses: actions/upload-artifact@v4
         with:

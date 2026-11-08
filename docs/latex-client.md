@@ -318,6 +318,12 @@ dependencies. Only use it while those source files are unchanged.
 For a desktop-wrapper-only change, `-- --package-only` also reuses the exported
 renderer. Rebuild the renderer whenever app source changes.
 
+CI uses its read-only GitHub token to download official Electron and installer
+tools through the release-asset API before compiling. It verifies their checksums
+and packages from the local cache, avoiding repeated failures of the browser
+download URLs. Local builds keep the normal downloader unless `GH_TOKEN` is set;
+opting into API downloads also requires the GitHub CLI.
+
 ## Merge an upstream release
 
 Commit local changes before updating. Select a released tag explicitly:
