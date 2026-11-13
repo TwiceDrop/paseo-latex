@@ -63,6 +63,43 @@ Windows jobs, reconstructs and verifies the APK, then uploads both installers an
 `SHA256SUMS.txt` before publishing. Remove the temporary assets branch afterward.
 Signing keys and credentials must never enter that branch.
 
+## CNB source and release mirror
+
+The domestic mirror is `https://cnb.cool/twicedrop/paseo-latex`. GitHub remains the
+source used for builds. **LaTeX CNB Mirror** synchronizes `main`, `paseo-latex` and
+personal `latex-v*-r*` tags without force-pushing or deleting CNB-only references.
+It runs after a push to `main`, a published GitHub release, or a successful manual
+**LaTeX Source Build** run. The last trigger covers releases published using
+`GITHUB_TOKEN`, which do not trigger another `release` workflow.
+
+Set the GitHub repository Actions secret `CNB_TOKEN` to a CNB access token scoped
+to this CNB repository with `repo-code:rw` and `repo-release:rw`. The workflow uses
+trusted `main` source and does not use pull-request code or artifacts with this
+secret. It needs no Android signing credentials: it copies the already signed
+GitHub installers without rebuilding them.
+
+To retry or mirror a particular published version, open GitHub **Actions → LaTeX
+CNB Mirror → Run workflow**. Leave `release_tag` empty for the latest stable
+personal release, or enter a tag such as `latex-v0.15.3-r1`. Existing attachments
+are downloaded and verified before reuse; mismatched files cause a failure and
+are never overwritten. A failed initial upload leaves a resumable draft. The
+script accepts the personal APK, Windows x64 EXE and `SHA256SUMS.txt`; extend its
+asset contract before adding future updater manifests.
+
+The mirror verifies GitHub digests and the checksum manifest, binds the CNB release
+to the exact Git tag commit, uploads attachments with permanent retention, then
+downloads and hashes them before publication. It checks anonymous public downloads
+after publication as well. Explicitly mirroring an older release does not make it
+latest. A red workflow is a failed migration check, even if some refs or draft
+attachments were already copied; rerun after correcting access or network issues.
+
+Public versioned downloads use
+`https://cnb.cool/twicedrop/paseo-latex/-/releases/download/<tag>/<filename>`.
+Copying releases does **not** change the updater in installed clients. CNB updater
+integration is tracked separately in [LATEX-003](latex-backlog.md#latex-003cnb-国内更新源).
+
+## Local Android builds
+
 For Android, install JDK 21, the Android SDK/NDK required by Expo 57 / RN 0.86,
 and restore the **existing** personal signing directory outside the checkout.
 After installing dependencies with `--ignore-scripts`, run

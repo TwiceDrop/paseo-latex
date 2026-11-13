@@ -15,6 +15,23 @@ const filtersPath = new URL(".github/ci-paths.yml", repoRoot);
 const serverTsconfigPath = new URL("packages/server/tsconfig.server.json", repoRoot);
 const desktopPackagePath = new URL("packages/desktop/package.json", repoRoot);
 
+test("CNB mirroring uses trusted main and excludes pull-request workflow completions", () => {
+  const source = readFileSync(new URL(".github/workflows/latex-cnb.yml", repoRoot), "utf8");
+  assert.doesNotMatch(source, /^  pull_request(?:_target)?:/m);
+  assert.match(source, /ref: main/);
+  assert.match(source, /github\.repository == 'TwiceDrop\/paseo-latex'/);
+  assert.match(source, /github\.event\.workflow_run\.event == 'workflow_dispatch'/);
+  assert.match(source, /github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.match(
+    source,
+    /github\.event\.workflow_run\.head_repository\.full_name == github\.repository/,
+  );
+  assert.match(source, /cancel-in-progress: false/);
+  assert.match(source, /contents: read/);
+  assert.match(source, /RELEASE_TAG: \$\{\{ inputs\.release_tag \}\}/);
+  assert.doesNotMatch(source, /run:.*\$\{\{/);
+});
+
 const gatedCiJobs = new Map([
   ["quality", { name: "quality", contracts: ["format", "quality", "relay", "sdk"] }],
   ["typecheck", { name: "typecheck", contract: "quality" }],
