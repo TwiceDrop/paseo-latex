@@ -8,10 +8,12 @@ const { createServer } = require("node:http");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 const { Transform } = require("node:stream");
-const { app } = require("electron");
+const { app, net } = require("electron");
+const { getNetSession } = require("electron-updater/out/electronHttpExecutor.js");
 const {
   createLatexAutoUpdater,
   latexUpdateVersion,
+  LATEX_UPDATE_FEED,
 } = require("../../packages/desktop/dist/features/latex-auto-updater.js");
 
 async function digest(file) {
@@ -31,13 +33,15 @@ async function main() {
   const directory = await mkdtemp(path.join(tmpdir(), "paseo-updater-smoke-"));
   let corrupt = false;
   let fileRequests = 0;
+  let manifestRequests = 0;
+  const installerUrl = `https://cnb.cool/twicedrop/paseo-latex/-/releases/download/latex-v${version}-r${revision}/${path.basename(installer)}`;
   const server = createServer((req, res) => {
     if (req.url.startsWith("/latest.yml")) {
       res.setHeader("Content-Type", "text/yaml");
       res.end(
         JSON.stringify({
           version: nextVersion,
-          files: [{ url: "installer.exe", sha512, size }],
+          files: [{ url: installerUrl, sha512, size }],
           releaseDate: new Date().toISOString(),
         }),
       );
@@ -66,13 +70,27 @@ async function main() {
   try {
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
     const url = `http://127.0.0.1:${server.address().port}`;
+    const suffixes = { linux: "-linux", darwin: "-mac" };
+    const suffix = suffixes[process.platform] ?? "";
+    const manifestUrl = new URL(`${LATEX_UPDATE_FEED}/latest${suffix}.yml`);
+    // Keep the factory's first provider and executor intact. Route its CNB URLs
+    // through real Electron networking to the local fixtures, without setFeedURL.
+    getNetSession().protocol.handle("https", (request) => {
+      const requested = new URL(request.url);
+      if (requested.origin === manifestUrl.origin && requested.pathname === manifestUrl.pathname) {
+        manifestRequests++;
+        return net.fetch(`${url}/latest.yml${requested.search}`);
+      }
+      assert.equal(requested.href, installerUrl);
+      return net.fetch(`${url}/installer.exe`);
+    });
     async function updaterFor(name) {
       const home = path.join(directory, name);
       await mkdir(home);
       const config = path.join(home, "app-update.yml");
       await writeFile(
         config,
-        JSON.stringify({ provider: "generic", url, updaterCacheDirName: name }),
+        JSON.stringify({ provider: "generic", url: LATEX_UPDATE_FEED, updaterCacheDirName: name }),
       );
       const updater = createLatexAutoUpdater(revision, {
         version: `${version}-latex.${revision - 1}`,
@@ -93,14 +111,6 @@ async function main() {
       updater.logger = null;
       updater.autoDownload = false;
       updater.autoInstallOnAppQuit = false;
-      // Keep the NSIS feed filename when checking this harness on Linux as well.
-      Object.assign(updater, { _testOnlyOptions: { platform: "win32" } });
-      updater.setFeedURL({
-        provider: "generic",
-        url,
-        channel: "latest",
-        useMultipleRangeRequest: false,
-      });
       return updater;
     }
     const valid = await updaterFor("valid");
@@ -114,11 +124,13 @@ async function main() {
     const invalid = await updaterFor("corrupt");
     await invalid.checkForUpdates();
     await assert.rejects(() => invalid.downloadUpdate(), /checksum mismatch/i);
+    assert.equal(manifestRequests, 2);
     assert.equal(fileRequests, 2);
     console.log(
-      "Windows updater: newer revision detected, full installer verified, corrupted download rejected; no installation attempted.",
+      "Windows updater: initial CNB provider checked without resetting its feed, newer revision detected, full installer verified, corrupted download rejected; no installation attempted.",
     );
   } finally {
+    getNetSession().protocol.unhandle("https");
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
     await rm(directory, { recursive: true, force: true });

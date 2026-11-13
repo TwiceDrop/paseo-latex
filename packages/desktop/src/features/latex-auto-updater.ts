@@ -36,20 +36,19 @@ class LatexAppAdapter extends ElectronAppAdapter {
 }
 
 export function createLatexAutoUpdater(revision: number, adapter?: AppAdapter): NsisUpdater {
-  const updater = new NsisUpdater(
-    {
-      provider: "generic",
-      url: LATEX_UPDATE_FEED,
-      channel: "latest",
-      useMultipleRangeRequest: false,
-    },
-    adapter ?? new LatexAppAdapter(revision),
-  );
+  const updater = new NsisUpdater(null, adapter ?? new LatexAppAdapter(revision));
   // A supplied AppAdapter opts electron-updater out of creating its HTTP executor.
+  // Create it before setFeedURL: the provider captures this object at construction.
   Object.assign(updater, {
     httpExecutor: new ElectronHttpExecutor((authInfo, callback) =>
       updater.emit("login", authInfo, callback),
     ),
+  });
+  updater.setFeedURL({
+    provider: "generic",
+    url: LATEX_UPDATE_FEED,
+    channel: "latest",
+    useMultipleRangeRequest: false,
   });
   updater.disableDifferentialDownload = true;
   updater.allowDowngrade = false;
