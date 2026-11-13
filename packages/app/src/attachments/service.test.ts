@@ -196,6 +196,35 @@ describe("shared message attachments on an official host", () => {
 });
 
 describe("shared attachment persistence failures", () => {
+  it("reads and cancels queued work with React Native's AbortSignal", async () => {
+    const { AbortController } = await import("abort-controller");
+    const { createSharedReadQueue } = await import("./shared-message-store");
+    const controller = new AbortController();
+    const signal = controller.signal as unknown as AbortSignal;
+    const queue = createSharedReadQueue(1);
+    await expect(queue.run(async () => "native read", signal)).resolves.toBe("native read");
+
+    let release!: () => void;
+    const first = queue.run(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    let cancelledReadRan = false;
+    const cancelled = queue.run(async () => {
+      cancelledReadRan = true;
+    }, signal);
+    const rejected = expect(cancelled).rejects.toMatchObject({ name: "AbortError" });
+    const next = queue.run(async () => "next read");
+    controller.abort();
+    release();
+    await first;
+    await rejected;
+    expect(cancelledReadRan).toBe(false);
+    await expect(next).resolves.toBe("next read");
+  });
+
   it("keeps simultaneous sends separate and rejects a changed retry", async () => {
     const { mkdtemp, rm } = await import("node:fs/promises");
     const { tmpdir } = await import("node:os");

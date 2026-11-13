@@ -209,7 +209,12 @@ export function createSharedReadQueue(limit: number) {
       if (active >= limit) await new Promise<void>((resolve) => waiting.push(resolve));
       else active += 1;
       try {
-        signal?.throwIfAborted();
+        // React Native's abort-controller implements `aborted`, without throwIfAborted().
+        if (signal?.aborted) {
+          const error = new Error("Attachment read cancelled");
+          error.name = "AbortError";
+          throw error;
+        }
         return await operation();
       } finally {
         const next = waiting.shift();
