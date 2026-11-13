@@ -14,10 +14,7 @@ on:
         description: Existing personal release tag for publish-only mode
         type: string
       build_run_id:
-        description: Successful Windows build run ID for publish-only mode
-        type: string
-      android_assets_ref:
-        description: Temporary branch containing APK parts and their checksum manifest
+        description: Successful Windows and Android build run ID for publish-only mode
         type: string
       android:
         description: Build the signed personal Android ARM64 APK
@@ -76,13 +73,15 @@ jobs:
       - name: Lint
         run: npm run lint -- --threads=2
       - name: Check workflow contracts
-        run: node --test scripts/ci-workflow.test.mjs
+        run: node --test scripts/ci-workflow.test.mjs scripts/upload-release-assets.test.mjs
+      - name: Check desktop updater behavior
+        run: npm run test --workspace=@getpaseo/desktop -- src/features/auto-updater.test.ts src/features/app-update-service.test.ts --maxWorkers=1 --bail=1
       - name: Run targeted client regression tests
-        run: npm run test --workspace=@getpaseo/app -- --project unit src/file-pane/document-preview/model.test.ts src/file-panels/catalog.test.ts src/components/markdown/renderer.test.ts src/components/markdown/math/source.test.ts --maxWorkers=1 --bail=1
+        run: npm run test --workspace=@getpaseo/app -- --project unit app.config.test.ts native-release-version.test.ts src/desktop/updates/desktop-app-updater.test.ts src/desktop/updates/desktop-updates.test.ts src/file-pane/document-preview/model.test.ts src/file-panels/catalog.test.ts src/components/markdown/renderer.test.ts src/components/markdown/math/source.test.ts --maxWorkers=1 --bail=1
       - name: Install browser runtime
         run: npm exec -- playwright install --with-deps chromium
       - name: Run real document and math browser regression tests
-        run: npm run test:browser --workspace=@getpaseo/app -- src/file-pane/document-preview/runtime.browser.test.ts src/components/markdown/math/enriched.browser.test.tsx --maxWorkers=1
+        run: npm run test:browser --workspace=@getpaseo/app -- src/file-pane/document-preview/runtime.browser.test.ts src/components/markdown/math/enriched.browser.test.tsx src/components/settings/row-density.browser.test.tsx --maxWorkers=1
       - name: Run sidebar and document preview regression tests
         env:
           NODE_OPTIONS: --max-old-space-size=4096
@@ -93,7 +92,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: latex-ui-regressions-${{ github.sha }}
-          path: packages/app/test-results
+          path: |
+            packages/app/test-results
+            packages/app/src/components/settings/.vitest-screenshots
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7
       - name: Compile the personal web client
@@ -227,7 +229,7 @@ jobs:
   publish:
     if: github.repository == 'TwiceDrop/paseo-latex' && github.event_name == 'workflow_dispatch' && inputs.publish_only
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: write
       actions: read
@@ -235,84 +237,76 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_TAG: ${{ inputs.release_tag }}
       BUILD_RUN_ID: ${{ inputs.build_run_id }}
-      ANDROID_ASSETS_REF: ${{ inputs.android_assets_ref }}
     steps:
-      - name: Verify release and build source
+      - name: Verify release and both build sources
         id: source
         shell: bash
         run: |
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^latex-v[0-9]+\.[0-9]+\.[0-9]+-r[1-9][0-9]?$ ]]
           [[ "$BUILD_RUN_ID" =~ ^[0-9]+$ ]]
-          test "$ANDROID_ASSETS_REF" = "build-assets/$RELEASE_TAG"
           sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID" --jq .head_sha)" = "$sha"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID/jobs" --jq '[.jobs[] | select(.name == "source" or .name == "windows")] | length == 2 and all(.[]; .conclusion == "success")')" = true
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID" > build-run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID/jobs?per_page=100" > build-jobs.json
+          EXPECTED_SOURCE_SHA="$sha" node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const run = JSON.parse(fs.readFileSync('build-run.json'));
+          assert.equal(run.head_sha, process.env.EXPECTED_SOURCE_SHA);
+          assert.equal(run.head_repository.full_name, process.env.GITHUB_REPOSITORY);
+          assert.equal(run.event, 'workflow_dispatch');
+          assert.equal(run.path, '.github/workflows/latex-source.yml');
+          const jobs = JSON.parse(fs.readFileSync('build-jobs.json')).jobs;
+          for (const name of ['source', 'windows', 'android']) {
+            const matches = jobs.filter(job => job.name === name);
+            assert.equal(matches.length, 1);
+            assert.equal(matches[0].conclusion, 'success', `${name} build must succeed`);
+          }
+          JS
           test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          path: source
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           name: paseo-latex-windows-${{ steps.source.outputs.sha }}
           path: windows
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ inputs.build_run_id }}
-      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          ref: ${{ inputs.android_assets_ref }}
-          path: incoming
-          persist-credentials: false
-      - name: Reconstruct and verify release files
-        env:
-          EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          name: paseo-latex-android-${{ steps.source.outputs.sha }}
+          path: android
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.build_run_id }}
+      - name: Prepare installers and versioned update manifest
         shell: bash
         run: |
           node --input-type=module <<'JS'
           import fs from 'node:fs';
           import path from 'node:path';
-          import crypto from 'node:crypto';
           import assert from 'node:assert/strict';
-          const manifest = JSON.parse(fs.readFileSync('incoming/manifest.json', 'utf8'));
-          assert.equal(manifest.sourceSha, process.env.EXPECTED_SOURCE_SHA);
-          const [, version, revision] = /^latex-v([0-9]+\.[0-9]+\.[0-9]+)-r([1-9][0-9]?)$/.exec(process.env.RELEASE_TAG);
-          const apkName = `paseo-latex-${version}-r${revision}.apk`;
-          const exeName = `Paseo-LaTeX-Setup-${version}-r${revision}-x64.exe`;
-          assert.equal(manifest.fileName, apkName);
-          assert.match(manifest.sha256, /^[a-f0-9]{64}$/);
-          assert.match(manifest.windowsSha256, /^[a-f0-9]{64}$/);
-          assert.match(manifest.certificateSha256, /^[a-f0-9]{64}$/);
-          assert.ok(Array.isArray(manifest.parts) && manifest.parts.length > 0 && manifest.parts.length <= 64);
-          assert.equal(new Set(manifest.parts).size, manifest.parts.length);
+          import { personalVersion, writeReleaseMetadata } from './source/scripts/latex/release-manifest.mjs';
+          const { version, revision } = personalVersion(process.env.RELEASE_TAG);
           fs.mkdirSync('publish');
-          const digest = crypto.createHash('sha256');
-          const fd = fs.openSync(path.join('publish', apkName), 'wx');
-          let size = 0;
-          try {
-            for (const [index, part] of manifest.parts.entries()) {
-              assert.equal(part, `apk.part${String(index).padStart(3, '0')}`);
-              const bytes = fs.readFileSync(path.join('incoming', part));
-              digest.update(bytes);
-              size += bytes.length;
-              fs.writeFileSync(fd, bytes);
-            }
-          } finally {
-            fs.closeSync(fd);
+          for (const [directory, name] of [
+            ['android', `paseo-latex-${version}-r${revision}.apk`],
+            ['windows', `Paseo-LaTeX-Setup-${version}-r${revision}-x64.exe`],
+          ]) {
+            const matches = fs.readdirSync(directory, { recursive: true }).filter(file => path.basename(file) === name);
+            assert.equal(matches.length, 1, name);
+            fs.copyFileSync(path.join(directory, matches[0]), path.join('publish', name));
           }
-          assert.equal(size, manifest.size);
-          assert.equal(digest.digest('hex'), manifest.sha256);
-          const installers = fs.readdirSync('windows', { recursive: true }).filter(file => path.basename(file) === exeName);
-          assert.equal(installers.length, 1);
-          const windows = fs.readFileSync(path.join('windows', installers[0]));
-          assert.equal(windows.subarray(0, 2).toString(), 'MZ');
-          assert.equal(crypto.createHash('sha256').update(windows).digest('hex'), manifest.windowsSha256);
-          fs.writeFileSync(path.join('publish', exeName), windows, { flag: 'wx' });
-          fs.writeFileSync('publish/SHA256SUMS.txt', `${manifest.sha256}  ${apkName}\n${manifest.windowsSha256}  ${exeName}\n`);
-          console.log('Both release files match their verified SHA-256 checksums and source commit.');
+          await writeReleaseMetadata('publish', process.env.RELEASE_TAG);
           JS
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
-      - name: Verify Android signature and application ID
+      - name: Verify original Android signature, application ID and revision
         shell: bash
         run: |
           set -euo pipefail
@@ -320,17 +314,18 @@ jobs:
           apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
           apkanalyzer="$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/apkanalyzer' -type f | sort -V | tail -n 1)"
           "$apksigner" verify --print-certs "${apk[0]}" > certificate.txt
-          cat certificate.txt
-          expected="$(node -pe "JSON.parse(require('fs').readFileSync('incoming/manifest.json')).certificateSha256")"
           actual="$(sed -nE 's/^(Signer #[0-9]+|V[0-9.]+ Signer): certificate SHA-256 digest: //p' certificate.txt | tr -d '\r' | tr 'A-F' 'a-f' | sort -u)"
-          printf 'Expected certificate SHA-256: %s\nActual certificate SHA-256: %s\n' "$expected" "$actual"
-          test "$actual" = "$expected"
-          app_id="$("$apkanalyzer" manifest application-id "${apk[0]}")"
-          printf 'Application ID: %s\n' "$app_id"
-          test "$app_id" = sh.paseo.latex
-      - name: Upload verified files and publish release
+          test "$actual" = eaf82adb5bbbe201a5304a3eee00cd0f9d135789d5a47bcd3b776d96dbd4d8fb
+          test "$("$apkanalyzer" manifest application-id "${apk[0]}")" = sh.paseo.latex
+          expected_version="${RELEASE_TAG#latex-v}"
+          expected_version="${expected_version%-r*}"
+          test "$("$apkanalyzer" manifest version-name "${apk[0]}")" = "$expected_version"
+          expected_code="$(node --input-type=module -e 'import {personalVersion} from "./source/scripts/latex/release-manifest.mjs"; import native from "./source/packages/app/native-release-version.js"; const v=personalVersion(process.env.RELEASE_TAG); console.log(native.getLatexVersionCode(v.version,v.revision))')"
+          test "$("$apkanalyzer" manifest version-code "${apk[0]}")" = "$expected_code"
+          (cd publish && sha256sum --check SHA256SUMS.txt)
+      - name: Upload verified installers, update metadata and publish
         shell: bash
         run: |
           set -euo pipefail
-          gh release upload "$RELEASE_TAG" publish/*.apk publish/*.exe publish/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$RELEASE_TAG" publish/*.apk publish/*.exe publish/latest.yml publish/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest

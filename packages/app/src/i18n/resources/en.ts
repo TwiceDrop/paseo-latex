@@ -1,4 +1,23 @@
 export const en = {
+  latexUpdates: {
+    title: "App updates · CNB",
+    source: "Update source",
+    check: "Check for updates",
+    download: "Download update",
+    install: "Install update",
+    status: {
+      idle: "Check for a new Paseo LaTeX version.",
+      checking: "Checking CNB…",
+      current: "No update is needed.",
+      available: "Version {{version}} is available.",
+      downloading: "Downloading {{version}} · {{progress}}%",
+      ready: "{{version}} has been verified and is ready to install.",
+      installing: "Verifying and opening the installer…",
+      permission: "Allow this app to install updates, then return and tap Install update.",
+      installer: "Confirm installation in the system installer. If cancelled, you can try again.",
+      error: "Update failed: {{message}}",
+    },
+  },
   paneFind: {
     connectionFailure: "Could not search this chat. Check the host connection and retry.",
     historyChangedFailure: "The chat changed while searching. Search again.",

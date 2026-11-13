@@ -93,6 +93,8 @@ import { isElectronRuntime } from "@/desktop/host";
 import { useDesktopAppUpdater } from "@/desktop/updates/use-desktop-app-updater";
 import { formatVersionWithPrefix } from "@/desktop/updates/desktop-updates";
 import { resolveAppVersion } from "@/utils/app-version";
+import { isLatexBuild, latexBuildRevision } from "@/updates/latex-distribution";
+import { NativeLatexAppUpdateRow } from "@/updates/latex-update-row";
 import { openChangelog } from "@/changelog";
 import { useAppDiagnosticStore } from "@/diagnostics/store";
 import { settingsStyles } from "@/styles/settings";
@@ -481,10 +483,13 @@ function AboutSection({ appVersion, appVersionText, isDesktopApp }: AboutSection
               <Text style={settingsStyles.rowTitle}>{t("settings.about.appVersion")}</Text>
               <Text style={settingsStyles.rowHint}>{t("settings.about.thisDevice")}</Text>
             </View>
-            <Text style={styles.aboutValue}>{appVersionText}</Text>
+            <Text style={styles.aboutValue}>
+              {isLatexBuild ? `${appVersionText}-r${latexBuildRevision}` : appVersionText}
+            </Text>
           </View>
           <WhatsNewRow />
           {isDesktopApp ? <DesktopAppUpdateRow /> : null}
+          {!isDesktopApp ? <NativeLatexAppUpdateRow /> : null}
         </View>
       </SettingsSection>
       <ConnectedHostsSection clientVersion={appVersion} />
@@ -699,19 +704,26 @@ function DesktopAppUpdateRow() {
 
   return (
     <>
-      <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
-        <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{t("settings.about.releaseChannel.label")}</Text>
-          <Text style={settingsStyles.rowHint}>
-            {t("settings.about.releaseChannel.description")}
-          </Text>
+      {isLatexBuild ? (
+        <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
+          <Text style={settingsStyles.rowTitle}>{t("latexUpdates.source")}</Text>
+          <Text style={styles.aboutValue}>CNB</Text>
         </View>
-        <SegmentedControl
-          value={settings.releaseChannel}
-          onValueChange={handleReleaseChannelChange}
-          options={releaseChannelOptions}
-        />
-      </View>
+      ) : (
+        <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
+          <View style={settingsStyles.rowContent}>
+            <Text style={settingsStyles.rowTitle}>{t("settings.about.releaseChannel.label")}</Text>
+            <Text style={settingsStyles.rowHint}>
+              {t("settings.about.releaseChannel.description")}
+            </Text>
+          </View>
+          <SegmentedControl
+            value={settings.releaseChannel}
+            onValueChange={handleReleaseChannelChange}
+            options={releaseChannelOptions}
+          />
+        </View>
+      )}
       <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
         <View style={settingsStyles.rowContent}>
           <Text style={settingsStyles.rowTitle}>{t("settings.about.updates.label")}</Text>

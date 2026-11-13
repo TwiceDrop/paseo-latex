@@ -4,9 +4,73 @@ import test from "node:test";
 import { collectAssets, uploadWithRetry } from "./upload-release-assets.mjs";
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  needsWindowsUpdateManifest,
+  verifyWindowsUpdateManifest,
+  writeReleaseMetadata,
+} from "./latex/release-manifest.mjs";
 import { releaseFiles, verifySums, verifyContent, publicationPatch } from "./latex/sync-cnb.mjs";
 
 const noSleep = () => Promise.resolve();
+
+test("personal release metadata binds the updater to the exact CNB installer and revision", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "paseo-release-"));
+  try {
+    const tag = "latex-v0.15.3-r2";
+    const exe = Buffer.from("MZ verified installer fixture");
+    await writeFile(join(directory, "Paseo-LaTeX-Setup-0.15.3-r2-x64.exe"), exe);
+    await writeFile(join(directory, "paseo-latex-0.15.3-r2.apk"), "PK verified APK fixture");
+    await writeReleaseMetadata(directory, tag);
+    const text = await readFile(join(directory, "latest.yml"), "utf8");
+    const manifest = JSON.parse(text);
+    const installer = {
+      size: exe.length,
+      sha512: createHash("sha512").update(exe).digest("base64"),
+    };
+    assert.equal(manifest.version, "0.15.3-latex.2");
+    assert.equal(
+      manifest.files[0].url,
+      "https://cnb.cool/twicedrop/paseo-latex/-/releases/download/latex-v0.15.3-r2/Paseo-LaTeX-Setup-0.15.3-r2-x64.exe",
+    );
+    verifyWindowsUpdateManifest(text, tag, installer);
+    assert.throws(
+      () => verifyWindowsUpdateManifest(text, "latex-v0.15.3-r3", installer),
+      /does not match/,
+    );
+    assert.throws(
+      () => verifyWindowsUpdateManifest(text, tag, { ...installer, size: 1 }),
+      /does not match/,
+    );
+    const names = [
+      "paseo-latex-0.15.3-r2.apk",
+      "Paseo-LaTeX-Setup-0.15.3-r2-x64.exe",
+      "SHA256SUMS.txt",
+      "latest.yml",
+    ];
+    const assets = await Promise.all(
+      names.map(async (name) => {
+        const bytes = await readFile(join(directory, name));
+        return {
+          name,
+          size: bytes.length,
+          digest: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+        };
+      }),
+    );
+    const release = { tag_name: tag, draft: false, prerelease: false, assets };
+    assert.deepEqual(releaseFiles(release), assets);
+    verifySums(await readFile(join(directory, "SHA256SUMS.txt"), "utf8"), assets);
+    assert.throws(() => releaseFiles({ ...release, assets: assets.slice(0, 3) }));
+    assert.equal(needsWindowsUpdateManifest("latex-v0.15.3-r1"), false);
+    assert.equal(needsWindowsUpdateManifest("latex-v0.15.3-r2"), true);
+    assert.equal(needsWindowsUpdateManifest("latex-v0.15.4-r1"), true);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test("retries a failing asset and keeps its siblings", async () => {
   const calls = [];

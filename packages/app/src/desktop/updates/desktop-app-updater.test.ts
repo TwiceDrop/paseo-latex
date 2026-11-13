@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { parseLatexRelease } from "@/updates/latex-release";
+import { createLatexUpdater, type LatexUpdatePort } from "@/updates/latex-updater";
 import { i18n } from "@/i18n/i18next";
 import {
   createDesktopAppUpdater,
@@ -12,6 +14,148 @@ import {
   createFakeDesktopAppUpdaterPort,
   type FakeDesktopAppUpdaterPort,
 } from "./test-utils/fake-desktop-app-updater-port";
+
+const personalRelease = {
+  tag_name: "latex-v0.15.3-r2",
+  draft: false,
+  prerelease: false,
+  assets: [
+    {
+      name: "paseo-latex-0.15.3-r2.apk",
+      size: 100,
+      hash_algo: "sha256",
+      hash_value: "a".repeat(64),
+    },
+  ],
+};
+
+describe("personal Android updater", () => {
+  it("uses only a complete stable personal APK and its versioned CNB URL", () => {
+    const release = parseLatexRelease(personalRelease);
+    expect(release.versionCode).toBe(1500302);
+    expect(release.url).toBe(
+      "https://cnb.cool/twicedrop/paseo-latex/-/releases/download/latex-v0.15.3-r2/paseo-latex-0.15.3-r2.apk",
+    );
+    for (const invalid of [
+      { ...personalRelease, draft: true },
+      { ...personalRelease, prerelease: true },
+      { ...personalRelease, tag_name: "v0.15.3" },
+      { ...personalRelease, assets: [] },
+      { ...personalRelease, assets: [...personalRelease.assets, ...personalRelease.assets] },
+      { ...personalRelease, assets: [{ ...personalRelease.assets[0], hash_algo: "md5" }] },
+      { ...personalRelease, assets: [{ ...personalRelease.assets[0], hash_value: "bad" }] },
+    ])
+      expect(() => parseLatexRelease(invalid)).toThrow();
+  });
+
+  function createPort(overrides: Partial<LatexUpdatePort> = {}): LatexUpdatePort {
+    return {
+      installedVersionCode: 1500301,
+      check: async () => parseLatexRelease(personalRelease),
+      download: async (_release, progress) => {
+        progress(1);
+      },
+      cancelDownload() {},
+      install: async () => "installer",
+      ...overrides,
+    };
+  }
+
+  it("detects a new revision and keeps permission denial/cancelled installation retryable", async () => {
+    let downloads = 0;
+    let installs = 0;
+    const updater = createLatexUpdater(
+      createPort({
+        download: async () => {
+          downloads++;
+        },
+        install: async () => (++installs === 1 ? "permission" : "installer"),
+      }),
+    );
+    await updater.check();
+    expect(updater.getState().status).toBe("available");
+    await updater.install();
+    expect(installs).toBe(0);
+    await updater.download();
+    expect(updater.getState().status).toBe("ready");
+    await updater.install();
+    expect(updater.getState().status).toBe("permission");
+    await updater.install();
+    expect(updater.getState().status).toBe("installer");
+    await updater.install();
+    expect(installs).toBe(3);
+    expect(downloads).toBe(1);
+  });
+
+  it("does not offer equal or older APKs", async () => {
+    for (const installedVersionCode of [1500302, 1500303, 1500401]) {
+      const updater = createLatexUpdater(createPort({ installedVersionCode }));
+      await updater.check();
+      expect(updater.getState().status).toBe("current");
+    }
+  });
+
+  it("exposes a failed check and checksum failure and permits a clean retry", async () => {
+    let checks = 0;
+    let downloads = 0;
+    const updater = createLatexUpdater(
+      createPort({
+        check: async () => {
+          if (++checks === 1) throw new Error("CNB unavailable");
+          return parseLatexRelease(personalRelease);
+        },
+        download: async () => {
+          if (++downloads === 1) throw new Error("Checksum mismatch");
+        },
+      }),
+    );
+    await updater.check();
+    expect(updater.getState().error).toBe("CNB unavailable");
+    await updater.check();
+    await updater.download();
+    expect(updater.getState()).toMatchObject({
+      status: "error",
+      error: "Checksum mismatch",
+      downloaded: false,
+    });
+    await updater.download();
+    expect(updater.getState()).toMatchObject({ status: "ready", error: null, downloaded: true });
+  });
+
+  it("ignores late completion and progress after cancellation", async () => {
+    let finish!: () => void;
+    let progress!: (value: number) => void;
+    let cancellations = 0;
+    const updater = createLatexUpdater(
+      createPort({
+        download: async (_release, listener) => {
+          progress = listener;
+          await new Promise<void>((resolve) => {
+            finish = resolve;
+          });
+        },
+        cancelDownload: () => {
+          cancellations++;
+        },
+      }),
+    );
+    await updater.check();
+    const pending = updater.download();
+    progress(0.5);
+    expect(updater.getState().progress).toBe(0.5);
+    updater.cancel();
+    progress(1);
+    finish();
+    await pending;
+    expect(updater.getState()).toMatchObject({
+      status: "available",
+      progress: 0,
+      downloaded: false,
+    });
+    expect(cancellations).toBe(1);
+    updater.dispose();
+  });
+});
 
 function createUpdater(
   overrides: {

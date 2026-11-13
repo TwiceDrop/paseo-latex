@@ -40,5 +40,6 @@
 - 调研：公开版本信息可通过 CNB 网页域名的 `/-/releases/latest` 配合 `Accept: application/json` 获取；下载使用 `/-/releases/download/<tag>/<filename>`。API 写入需要限定仓库的访问令牌，代码同步需要 `repo-code:rw`，Release 上传需要 `repo-release:rw`。
 - [x] 编写源码与既有 Release 同步流程：只同步正式分支与个人标签，校验 GitHub 哈希、校验清单及 CNB 下载内容后发布；重复运行不会覆盖不同内容的同名附件。操作见 [客户端说明](latex-client.md#cnb-source-and-release-mirror)。
 - [x] 2026-11-13 完成首次远端同步与公开下载验证：[CNB `latex-v0.15.3-r1`](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.3-r1) 已正式发布 Windows x64、Android ARM64 和校验清单。两个正式分支、四个个人标签已同步；版本标签仍指向原构建源码 `5fac87c6c7e6608814aac920d8071b535caf07df`。33 项同步与工作流检查通过，上传后及匿名下载的 SHA-256 均与 GitHub 一致，见 [迁移验证记录](https://github.com/TwiceDrop/paseo-latex/actions/runs/43366148096)。
-- [ ] 实施客户端更新器接入：Windows 的更新描述文件与安装流程、Android 的版本检查与签名兼容升级，保留现有个人应用标识。现有 `0.15.3-r1` 安装包尚不使用 CNB 更新源。
+- [x] 实施客户端更新器接入：Windows 使用 CNB generic feed、独立缓存与完整下载，按上游版本和个人修订比较；Android 在“设置 → 关于”检查更新，由原生模块流式下载、核验哈希/包名/版本/签名，再打开系统安装器。原应用标识、NSIS GUID、Android 签名与主机协议版本保持兼容。
+- [ ] 构建并发布 `0.15.3-r2`：GitHub 与 CNB 同步 APK、Windows x64、`latest.yml`、`SHA256SUMS.txt`。旧 `0.15.3-r1` 需手动安装一次新版本才能获得更新器。
 - [ ] 验证国内网络、更新失败回退与真实设备安装。已观测 CNB 附件重定向到临时下载地址、单段 Range 可用；多段 Range 未返回 multipart，接入桌面更新器时应先使用完整下载，不能假定支持差分多段下载。云端可访问不等于国内速度实测。

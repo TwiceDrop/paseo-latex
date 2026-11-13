@@ -34,6 +34,7 @@ describe("desktop-updates helpers", () => {
 
     expect(formatVersionWithPrefix("0.2.0")).toBe("v0.2.0");
     expect(formatVersionWithPrefix("v0.2.0")).toBe("v0.2.0");
+    expect(formatVersionWithPrefix("0.15.3-latex.2")).toBe("v0.15.3-r2");
     expect(formatVersionWithPrefix(null)).toBe("\u2014");
   });
 

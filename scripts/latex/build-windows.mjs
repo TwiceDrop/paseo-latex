@@ -35,6 +35,8 @@ const env = {
   EXPO_NO_TELEMETRY: "1",
   CSC_IDENTITY_AUTO_DISCOVERY: "false",
   PASEO_LATEX_WINDOWS_REVISION: String(revision),
+  PASEO_LATEX_REVISION: String(revision),
+  APP_VARIANT: "latex",
   ...(process.env.GH_TOKEN ? { ELECTRON_BUILDER_CACHE: path.join(toolsDirectory, "cache") } : {}),
 };
 const npm = process.env.npm_execpath;
@@ -117,4 +119,39 @@ const packagingExitCode = await runWithRetry(
   },
 );
 if (packagingExitCode !== 0) process.exit(packagingExitCode);
+if (electronDist) {
+  // The packaging distribution has no default_app.asar. Install a smoke-only
+  // entry point after packaging, so the delivered app never includes this harness.
+  const smokeApp = path.join(electronDist, "resources/app");
+  fs.mkdirSync(smokeApp, { recursive: true });
+  fs.writeFileSync(
+    path.join(smokeApp, "package.json"),
+    JSON.stringify({
+      name: "paseo-latex-updater-smoke",
+      version,
+      main: path.join(root, "scripts/latex/smoke-updater.cjs"),
+    }),
+  );
+  await new Promise((resolve, reject) => {
+    const child = spawn(path.join(electronDist, "electron.exe"), [], {
+      cwd: root,
+      env: {
+        ...env,
+        PASEO_LATEX_UPDATER_SMOKE_INSTALLER: installer,
+        PASEO_LATEX_UPDATER_SMOKE_VERSION: version,
+        PASEO_LATEX_UPDATER_SMOKE_REVISION: String(revision),
+      },
+      stdio: "inherit",
+      windowsHide: true,
+    });
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`Windows updater smoke check failed (${code})`));
+    });
+  });
+}
 console.log(`\nInstaller: ${installer}`);

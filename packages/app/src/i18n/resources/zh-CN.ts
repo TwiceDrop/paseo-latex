@@ -2,6 +2,25 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
 export const zhCN: TranslationResources = {
+  latexUpdates: {
+    title: "应用更新 · CNB",
+    source: "更新来源",
+    check: "检查更新",
+    download: "下载更新",
+    install: "安装更新",
+    status: {
+      idle: "检查 Paseo LaTeX 新版本。",
+      checking: "正在检查 CNB 更新…",
+      current: "当前无需更新。",
+      available: "发现新版本 {{version}}。",
+      downloading: "正在下载 {{version}} · {{progress}}%",
+      ready: "{{version}} 已通过校验，可以安装。",
+      installing: "正在验证并打开安装器…",
+      permission: "请允许此应用安装更新，返回后再次点击“安装更新”。",
+      installer: "请在系统安装界面确认安装；如果取消，可以再次点击安装。",
+      error: "更新失败：{{message}}",
+    },
+  },
   paneFind: {
     connectionFailure: "无法搜索此聊天。请检查主机连接后重试。",
     historyChangedFailure: "搜索期间聊天已更改。请重新搜索。",

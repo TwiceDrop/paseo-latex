@@ -5,15 +5,17 @@ const withAndroidAsyncStorageSize = require("./plugins/with-android-async-storag
 const withAndroidOptionalCamera = require("./plugins/with-android-optional-camera");
 const withAndroidProfileable = require("./plugins/with-android-profileable");
 const withAndroidLatexSigning = require("./plugins/with-android-latex-signing");
+const withAndroidLatexUpdates = require("./plugins/with-android-latex-updates");
 const withFdroidAutolinking = require("./plugins/with-fdroid-autolinking");
 const withPasteInput = require("./plugins/with-paste-input");
 const withAndroidScroll = require("./modules/paseo-scroll/app.plugin");
-const { getNativeReleaseVersion } = require("./native-release-version");
+const { getNativeReleaseVersion, getLatexVersionCode } = require("./native-release-version");
 const appVariant = process.env.APP_VARIANT ?? "production";
 const isFdroidBuild = process.env.PASEO_FDROID_BUILD === "1";
 const isWatchdogBuild = process.env.PASEO_WATCHDOG_BUILD === "1";
 const isProfileBuild = process.env.PASEO_PROFILE_BUILD === "1";
 const isLatexBuild = appVariant === "latex";
+const latexRevision = Number(process.env.PASEO_LATEX_REVISION ?? "1");
 
 const buildProfile = isFdroidBuild
   ? {
@@ -111,14 +113,7 @@ let androidVersionCode = nativeReleaseVersion.androidVersionCode;
 let expoAccount = { owner: "getpaseo" };
 let easConfig = { eas: { projectId: "0e7f65ce-0367-46c8-a238-2b65963d235a" } };
 if (isLatexBuild) {
-  const revision = Number(process.env.PASEO_LATEX_REVISION ?? "1");
-  if (!Number.isInteger(revision) || revision < 1 || revision > 99) {
-    throw new Error("PASEO_LATEX_REVISION must be an integer from 1 through 99");
-  }
-  androidVersionCode = androidVersionCode * 100 + revision;
-  if (androidVersionCode > 2_100_000_000) {
-    throw new Error("The LaTeX version code exceeds Android's supported range");
-  }
+  androidVersionCode = getLatexVersionCode(pkg.version, latexRevision);
   expoAccount = {};
   easConfig = {};
   const personalProjectId = process.env.PASEO_LATEX_EAS_PROJECT_ID;
@@ -216,7 +211,7 @@ export default {
       ],
       ...buildProfile.fdroidPlugins,
       ...(isProfileBuild || isWatchdogBuild ? [withAndroidProfileable] : []),
-      ...(isLatexBuild ? [withAndroidLatexSigning] : []),
+      ...(isLatexBuild ? [withAndroidLatexSigning, withAndroidLatexUpdates] : []),
     ],
     experiments: {
       typedRoutes: true,
@@ -224,6 +219,8 @@ export default {
       autolinkingModuleResolution: true,
     },
     extra: {
+      latexBuild: isLatexBuild,
+      latexRevision: isLatexBuild ? latexRevision : undefined,
       fdroidBuild: isFdroidBuild,
       profileBuild: isProfileBuild,
       watchdogBuild: isWatchdogBuild,

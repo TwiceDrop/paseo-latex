@@ -180,7 +180,7 @@ export function isVersionMismatch(
 }
 
 export function formatVersionWithPrefix(version: string | null | undefined): string {
-  const value = version?.trim();
+  const value = version?.trim().replace(/-latex\.(\d+)$/, "-r$1");
   if (!value) {
     return "\u2014";
   }

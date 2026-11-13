@@ -4,8 +4,9 @@ import path from "node:path";
 import { app } from "electron";
 import { UUID } from "builder-util-runtime";
 import log from "electron-log/main";
-import { autoUpdater } from "electron-updater";
-import { isLatexDesktop } from "../distribution.js";
+import { autoUpdater as officialAutoUpdater } from "electron-updater";
+import { isLatexDesktop, latexDesktopRevision } from "../distribution.js";
+import { createLatexAutoUpdater, latexUpdateVersion } from "./latex-auto-updater.js";
 import {
   createAppUpdateService,
   type AppUpdateCheckResult,
@@ -35,6 +36,14 @@ export {
 };
 
 let cachedStagingUserIdPromise: Promise<string> | null = null;
+const isLatexWindows = isLatexDesktop && process.platform === "win32";
+const autoUpdater = isLatexWindows
+  ? createLatexAutoUpdater(latexDesktopRevision)
+  : officialAutoUpdater;
+
+function updateVersion(version: string): string {
+  return isLatexWindows ? latexUpdateVersion(version, latexDesktopRevision) : version;
+}
 
 const UPDATE_CHANNEL_NOT_PUBLISHED_CODE = "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND";
 
@@ -82,6 +91,7 @@ const updateLifecycleLog = createAppUpdateLifecycleLogger(log);
 
 function isUpdateChannelNotPublished(error: unknown): boolean {
   return (
+    !isLatexWindows &&
     typeof error === "object" &&
     error !== null &&
     "code" in error &&
@@ -151,8 +161,8 @@ class ElectronAppUpdateRuntime implements AppUpdateRuntime {
     // Electron's built-in handler would install an older download without checking
     // whether a newer release has superseded it.
     autoUpdater.autoInstallOnAppQuit = false;
-    autoUpdater.allowPrerelease = input.releaseChannel === "beta";
-    autoUpdater.channel = input.releaseChannel === "beta" ? "beta" : "latest";
+    autoUpdater.allowPrerelease = isLatexWindows || input.releaseChannel === "beta";
+    autoUpdater.channel = !isLatexWindows && input.releaseChannel === "beta" ? "beta" : "latest";
     autoUpdater.allowDowngrade = false;
     autoUpdater.isUserWithinRollout = async (info) => {
       try {
@@ -225,9 +235,7 @@ class ElectronAppUpdateRuntime implements AppUpdateRuntime {
 
 const appUpdateService = createAppUpdateService({
   runtime: new ElectronAppUpdateRuntime(),
-  // Personal installers are updated by rebuilding; official updates would
-  // replace the custom client and belong to a different installer identity.
-  isPackaged: () => app.isPackaged && !isLatexDesktop,
+  isPackaged: () => app.isPackaged && (!isLatexDesktop || isLatexWindows),
   now: () => Date.now(),
   bucket: async () => bucketFromStagingUserId(await getStagingUserId()),
   reportCheckError: (error) => {
@@ -254,6 +262,7 @@ export async function checkForAppUpdate({
   releaseChannel: AppReleaseChannel;
   intent: AppUpdateCheckIntent;
 }): Promise<AppUpdateCheckResult> {
+  currentVersion = updateVersion(currentVersion);
   updateLifecycleLog.checkStarted({ currentVersion, releaseChannel, intent });
   const result = await appUpdateService.checkForAppUpdate({
     currentVersion,
@@ -282,6 +291,7 @@ export async function downloadAndInstallUpdate(
   },
   onBeforeQuit?: () => Promise<void>,
 ): Promise<AppUpdateInstallResult> {
+  currentVersion = updateVersion(currentVersion);
   return appUpdateService.downloadAndInstallUpdate(
     { currentVersion, releaseChannel },
     onBeforeQuit,
@@ -297,6 +307,7 @@ export async function installAppUpdateOnQuit({
   releaseChannel: AppReleaseChannel;
   signal: AbortSignal;
 }): Promise<boolean> {
+  currentVersion = updateVersion(currentVersion);
   if (
     !shouldInstallAppUpdateOnQuit({
       platform: process.platform,

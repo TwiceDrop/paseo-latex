@@ -1,4 +1,9 @@
 {
   "platforms": ["android"],
-  "android": { "modules": ["sh.paseo.download.PaseoFileDownloadModule"] }
+  "android": {
+    "modules": [
+      "sh.paseo.download.PaseoFileDownloadModule",
+      "sh.paseo.download.PaseoAppUpdateModule"
+    ]
+  }
 }

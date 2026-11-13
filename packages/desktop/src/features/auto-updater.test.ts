@@ -3,6 +3,15 @@ import os from "node:os";
 import path from "node:path";
 import { UUID } from "builder-util-runtime";
 import { describe, expect, it, vi } from "vitest";
+import { latexUpdateVersion } from "./latex-auto-updater";
+
+describe("personal update versions", () => {
+  it("includes the revision without changing the upstream application version", () => {
+    expect(latexUpdateVersion("0.15.3", 2)).toBe("0.15.3-latex.2");
+    expect(() => latexUpdateVersion("0.15.3", 100)).toThrow("Invalid personal update version");
+    expect(() => latexUpdateVersion("0.15.3-beta.1", 2)).toThrow("Invalid personal update version");
+  });
+});
 
 const { autoUpdaterMock } = vi.hoisted(() => {
   const handlers = new Map<string, (value: unknown) => void>();

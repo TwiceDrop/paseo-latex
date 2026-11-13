@@ -5,7 +5,9 @@ import path from "node:path";
 // environment variables must not turn an official install into a personal one.
 const manifest = JSON.parse(readFileSync(path.join(__dirname, "../package.json"), "utf8")) as {
   paseoDistribution?: string;
+  paseoLatexRevision?: number;
 };
 export const isLatexDesktop = manifest.paseoDistribution === "latex";
+export const latexDesktopRevision = manifest.paseoLatexRevision ?? 1;
 export const desktopProductName = isLatexDesktop ? "Paseo LaTeX" : "Paseo";
 export const desktopAppId = isLatexDesktop ? "sh.paseo.latex.desktop" : "sh.paseo.desktop";

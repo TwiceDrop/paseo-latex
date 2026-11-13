@@ -5,6 +5,11 @@ import { appendFile, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  hashFile,
+  needsWindowsUpdateManifest,
+  verifyWindowsUpdateManifest,
+} from "./release-manifest.mjs";
 
 const githubRepo = "TwiceDrop/paseo-latex";
 const cnbRepo = "twicedrop/paseo-latex";
@@ -21,8 +26,9 @@ export function releaseFiles(release) {
     `Paseo-LaTeX-Setup-${version}-x64.exe`,
     "SHA256SUMS.txt",
   ];
+  if (needsWindowsUpdateManifest(release.tag_name)) names.push("latest.yml");
   if (release.assets.length !== names.length) {
-    throw new Error("Release must contain exactly the APK, EXE and SHA256SUMS.txt");
+    throw new Error("Release is missing required installers, checksums or update metadata");
   }
   return names.map((name) => {
     const asset = release.assets.find((candidate) => candidate.name === name);
@@ -286,6 +292,13 @@ async function mirrorRelease(source, directory) {
   for (const asset of assets)
     await verifyContent(createReadStream(join(directory, asset.name)), asset);
   verifySums(await readFile(join(directory, "SHA256SUMS.txt"), "utf8"), assets);
+  if (needsWindowsUpdateManifest(tag)) {
+    const installer = assets.find((asset) => asset.name.endsWith(".exe"));
+    verifyWindowsUpdateManifest(await readFile(join(directory, "latest.yml"), "utf8"), tag, {
+      size: installer.size,
+      sha512: await hashFile(join(directory, installer.name), "sha512", "base64"),
+    });
+  }
   console.log(`GitHub assets verified for ${tag}, source ${commit}`);
 
   let target = await cnb(`/tags/${tag}`, { allowMissing: true });
@@ -352,7 +365,7 @@ async function mirrorRelease(source, directory) {
   if (process.env.GITHUB_STEP_SUMMARY) {
     await appendFile(
       process.env.GITHUB_STEP_SUMMARY,
-      `CNB: [${tag}](${url})\n\nSource: \`${commit}\`\n\nAll three public downloads match GitHub SHA-256 digests.\n`,
+      `CNB: [${tag}](${url})\n\nSource: \`${commit}\`\n\nAll ${assets.length} public downloads match GitHub SHA-256 digests.\n`,
     );
   }
 }

@@ -14,7 +14,12 @@ module.exports = {
   executableName: "PaseoLaTeX",
   // Do not replace the official paseo: URL handler.
   protocols: [],
-  publish: null,
+  publish: {
+    provider: "generic",
+    url: "https://cnb.cool/twicedrop/paseo-latex/-/releases/latest/download",
+    channel: "latest",
+    useMultipleRangeRequest: false,
+  },
   // Daemon version comparison uses app.getVersion(); keep it equal to upstream.
   extraMetadata: { paseoDistribution: "latex", paseoLatexRevision: revision, version },
   buildVersion: `${version}.${revision}`,

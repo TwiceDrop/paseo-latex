@@ -96,6 +96,29 @@ describe("Android app config", () => {
     expect(exp.owner).toBe("getpaseo");
   }, 30_000);
 
+  it("limits the APK installation permission and update provider to the personal build", async () => {
+    process.env.APP_VARIANT = "latex";
+    const personal = await resolveAndroidManifest();
+    expect(
+      personal["uses-permission"].map((entry: ManifestEntry) => entry.$["android:name"]),
+    ).toContain("android.permission.REQUEST_INSTALL_PACKAGES");
+    const provider = personal.application[0].provider.find(
+      (entry: ManifestEntry) => entry.$["android:authorities"] === "${applicationId}.updates",
+    );
+    expect(provider.$["android:exported"]).toBe("false");
+    expect(provider["meta-data"][0].$["android:resource"]).toBe("@xml/paseo_update_paths");
+    process.env.APP_VARIANT = "production";
+    const official = await resolveAndroidManifest();
+    expect(
+      official["uses-permission"].map((entry: ManifestEntry) => entry.$["android:name"]),
+    ).not.toContain("android.permission.REQUEST_INSTALL_PACKAGES");
+    expect(
+      (official.application[0].provider ?? []).some(
+        (entry: ManifestEntry) => entry.$["android:authorities"] === "${applicationId}.updates",
+      ),
+    ).toBe(false);
+  }, 30_000);
+
   it.each([
     ["Google Play", "0"],
     ["F-Droid", "1"],

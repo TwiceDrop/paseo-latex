@@ -1,4 +1,81 @@
 import { describe, expect, it } from "vitest";
+import { createServer, request, type IncomingMessage, type RequestOptions } from "node:http";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { NodeHttpExecutor } from "builder-util/out/nodeHttpExecutor.js";
+import { createLatexAutoUpdater, latexUpdateVersion } from "./latex-auto-updater";
+
+class LoopbackUpdateExecutor extends NodeHttpExecutor {
+  override createRequest(options: RequestOptions, callback: (response: IncomingMessage) => void) {
+    if (options.hostname !== "127.0.0.1") throw new Error("Test requests must remain on loopback");
+    return request(options, callback);
+  }
+}
+
+it("checks personal revisions through the real generic update provider without downgrades", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "paseo-updater-"));
+  let published = "0.15.3-latex.2";
+  const paths: string[] = [];
+  const server = createServer((req, res) => {
+    paths.push(req.url ?? "");
+    res.setHeader("Content-Type", "text/yaml");
+    res.end(
+      JSON.stringify({
+        version: published,
+        files: [{ url: "Paseo-LaTeX.exe", sha512: Buffer.alloc(64).toString("base64"), size: 10 }],
+        releaseDate: "2026-11-13T00:00:00.000Z",
+      }),
+    );
+  });
+  try {
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Missing test server address");
+    const updater = createLatexAutoUpdater(2, {
+      version: latexUpdateVersion("0.15.3", 2),
+      name: "Paseo LaTeX",
+      isPackaged: true,
+      appUpdateConfigPath: join(directory, "app-update.yml"),
+      userDataPath: directory,
+      baseCachePath: directory,
+      whenReady: async () => {},
+      quit() {},
+      relaunch() {},
+      onQuit() {},
+    });
+    updater.logger = null;
+    updater.autoDownload = false;
+    Object.assign(updater, {
+      httpExecutor: new LoopbackUpdateExecutor(),
+      _testOnlyOptions: { platform: "win32" },
+    });
+    updater.setFeedURL({
+      provider: "generic",
+      url: `http://127.0.0.1:${address.port}`,
+      channel: "latest",
+      useMultipleRangeRequest: false,
+    });
+    expect(updater.disableDifferentialDownload).toBe(true);
+    expect(updater.allowDowngrade).toBe(false);
+    for (const [version, available] of [
+      ["0.15.3-latex.1", false],
+      ["0.15.3-latex.2", false],
+      ["0.15.3-latex.3", true],
+      ["0.15.4-latex.1", true],
+    ] as const) {
+      published = version;
+      const result = await updater.checkForUpdates();
+      expect(result?.isUpdateAvailable).toBe(available);
+    }
+    expect(paths.length).toBe(4);
+    expect(paths.every((path) => path.startsWith("/latest.yml"))).toBe(true);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 import {
   createAppUpdateService,

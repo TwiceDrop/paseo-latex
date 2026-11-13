@@ -55,13 +55,11 @@ Both build options share the revision input; a new upstream version starts at 1.
 Successful builds are available as Actions artifacts; they do not create a release.
 
 The workflow's `publish_only` mode publishes an existing draft personal release.
-It requires the release tag, the successful Windows build run ID, and a temporary
-`build-assets/<release-tag>` branch containing only APK parts and `manifest.json`.
-The manifest binds both installers' SHA-256 hashes and the Android signing
-certificate to the tagged source commit. The publisher checks the source and
-Windows jobs, reconstructs and verifies the APK, then uploads both installers and
-`SHA256SUMS.txt` before publishing. Remove the temporary assets branch afterward.
-Signing keys and credentials must never enter that branch.
+Supply the release tag and the successful build run ID. The source, Windows and
+Android jobs must all succeed in that manual run, and its source must match the
+tag exactly. The publisher downloads both Actions artifacts, verifies the original
+Android certificate, application ID and version code, and generates `latest.yml`
+and `SHA256SUMS.txt` before publishing. It no longer needs an APK staging branch.
 
 ## CNB source and release mirror
 
@@ -84,8 +82,10 @@ CNB Mirror → Run workflow**. Leave `release_tag` empty for the latest stable
 personal release, or enter a tag such as `latex-v0.15.3-r1`. Existing attachments
 are downloaded and verified before reuse; mismatched files cause a failure and
 are never overwritten. A failed initial upload leaves a resumable draft. The
-script accepts the personal APK, Windows x64 EXE and `SHA256SUMS.txt`; extend its
-asset contract before adding future updater manifests.
+script accepts the personal APK, Windows x64 EXE and `SHA256SUMS.txt`. From
+`latex-v0.15.3-r2` it also requires `latest.yml` and checks its versioned CNB URL,
+installer size and SHA-512 before mirroring it. Older releases retain their
+original three-file contract.
 
 The mirror verifies GitHub digests and the checksum manifest, binds the CNB release
 to the exact Git tag commit, uploads attachments with permanent retention, then
@@ -99,8 +99,40 @@ enough to validate the release source.
 
 Public versioned downloads use
 `https://cnb.cool/twicedrop/paseo-latex/-/releases/download/<tag>/<filename>`.
-Copying releases does **not** change the updater in installed clients. CNB updater
-integration is tracked separately in [LATEX-003](latex-backlog.md#latex-003cnb-国内更新源).
+Clients installed before `0.15.3-r2` need one manual installation of the new
+personal installer. Copying a release cannot add an updater to an old binary.
+
+## Personal client updates
+
+Windows uses the existing Electron/NSIS updater with the public CNB feed
+`https://cnb.cool/twicedrop/paseo-latex/-/releases/latest/download`.
+The private updater version is `<upstream>-latex.<revision>`, so a new personal
+revision is detected even when the upstream version is unchanged. The packaged
+application and daemon protocol keep the upstream version. The updater uses an
+independent cache, SHA-512 verification and full downloads; differential and
+multiple-range downloads are disabled for CNB. The personal channel is always
+the stable personal feed. Official installations keep the official updater.
+
+On Android, open **Settings → About → App updates · CNB** and check for a new
+version. Download progress, cancellation and failures are shown in that row.
+The native downloader streams to the app cache, verifies size and SHA-256, then
+checks the APK package, version and signing certificate against the installed
+personal app. It never reads the whole APK into JavaScript. A verified cached APK
+can be reused. Choose **Install update** to open Android's system installer. If
+Android asks to allow installation from this app, enable that permission, return
+and choose **Install update** again. Cancelling the installer leaves it retryable;
+opening the installer is not reported as a completed installation.
+
+Both platforms use anonymous public CNB URLs; no CNB access token or signing key
+is included in a client. Android's installation permission and FileProvider are
+only added to the personal build. Keep the original signing key, package ID,
+Windows app ID and NSIS GUID when releasing later updates.
+
+The Windows build runs a real Electron check and download against a loopback
+server using the just-built installer. It also verifies that a corrupted download
+is rejected and never executes the installer during that check. Browser tests
+cover the settings row through a native-operation adapter; they do not replace
+an Android device test of permission and system-installer UI.
 
 ## Local Android builds
 
