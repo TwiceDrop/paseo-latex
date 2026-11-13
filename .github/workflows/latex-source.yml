@@ -85,7 +85,7 @@ jobs:
       - name: Check desktop updater behavior
         run: npm run test --workspace=@getpaseo/desktop -- src/features/auto-updater.test.ts src/features/app-update-service.test.ts --maxWorkers=1 --bail=1
       - name: Run targeted client regression tests
-        run: npm run test --workspace=@getpaseo/app -- --project unit app.config.test.ts native-release-version.test.ts src/desktop/updates/desktop-app-updater.test.ts src/desktop/updates/desktop-updates.test.ts src/file-pane/document-preview/model.test.ts src/file-panels/catalog.test.ts src/components/markdown/renderer.test.ts src/components/markdown/math/source.test.ts --maxWorkers=1 --bail=1
+        run: npm run test --workspace=@getpaseo/app -- --project unit app.config.test.ts native-release-version.test.ts src/desktop/updates/desktop-app-updater.test.ts src/desktop/updates/desktop-updates.test.ts src/file-pane/document-preview/model.test.ts src/file-panels/catalog.test.ts src/components/markdown/renderer.test.ts src/components/markdown/math/source.test.ts src/attachments/service.test.ts src/composer/actions.test.ts src/i18n/resources.test.ts --maxWorkers=1 --bail=1
       - name: Install browser runtime
         run: npm exec -- playwright install --with-deps chromium
       - name: Run real document and math browser regression tests
@@ -95,6 +95,11 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
           E2E_RECORD_VIDEO: "1"
         run: npm run test:e2e --workspace=@getpaseo/app -- e2e/browser/sidebar-reorder.spec.ts e2e/browser/document-preview.spec.ts --workers=1
+      - name: Check attachments across devices and official hosts
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          E2E_RECORD_VIDEO: "1"
+        run: npm run test:e2e --workspace=@getpaseo/app -- e2e/browser/composer-attachments.spec.ts --grep 'shared attachment' --workers=1
       - name: Upload UI regression evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

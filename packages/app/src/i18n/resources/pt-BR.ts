@@ -350,6 +350,12 @@ export const ptBR: TranslationResources = {
     attachments: {
       dismissImage: "Dispensar imagem",
       closeImage: "Fechar imagem",
+      sharedLoadFailed: "Não foi possível carregar os anexos compartilhados: {{error}}",
+      sharedSaveFailed: "Não foi possível salvar os anexos no host: {{error}}",
+      sharedLoading: "Carregando anexos…",
+      sharedHostRequired: "Atualize o host oficial para compartilhar anexos.",
+      sharedImagesMissing:
+        "Uma imagem anexada está indisponível. Adicione-a novamente antes de enviar.",
       imageLoadFailed: "Não foi possível carregar a imagem",
       imageUnavailable: "Imagem indisponível",
       imagePreviewUnavailable: "Prévia da imagem indisponível.",

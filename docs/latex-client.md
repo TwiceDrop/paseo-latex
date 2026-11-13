@@ -142,6 +142,35 @@ test hid the initialization defect in the first two Windows updater releases. Br
 cover the settings row through a native-operation adapter; they do not replace
 an Android device test of permission and system-installer UI.
 
+## Shared chat attachments with official hosts
+
+The personal client uses the official host's existing file upload and file editing
+RPCs to share sent attachments. It does not add a daemon RPC or change canonical
+timeline schemas. Both viewing clients need this patch; an official client still
+renders its ordinary text-only history. Sending requires the host's existing
+`workspaceFileEditing` and `canonicalSubmittedPrompts` capabilities.
+
+Metadata lives under the host OS user's `~/.paseo-latex/attachments-v1/`, scoped by
+the host's advertised server ID and message ID. Uploaded image bytes live in the
+host's existing `$PASEO_HOME/uploads` store; files already uploaded through the
+composer keep their original host references. Include both directories in host
+backups. These records are not synced to GitHub or CNB and are not automatically
+removed when a chat closes. Images still travel through the provider's original
+image-input path, so sharing adds one durable upload before sending.
+
+Publish each message index before sending the prompt. A failed index write leaves
+the draft available for retry. Separate immutable message files avoid concurrent
+writers replacing a shared conversation manifest. Read metadata only for mounted,
+active chat rows, with bounded read concurrency; fetch image bytes separately and
+release preview URLs when their consumers unmount. Host file paths are resolved
+through the existing file-preview transport, including remote connections.
+
+Opening an old message on its original client can copy surviving local attachments
+to the host. A second client cannot reconstruct attachments that were never shared
+and whose sender cache is gone. Missing metadata means an ordinary old text row;
+read failures and malformed metadata show a retry action instead of silently
+claiming successful synchronization.
+
 ## Local Android builds
 
 For Android, install JDK 21, the Android SDK/NDK required by Expo 57 / RN 0.86,

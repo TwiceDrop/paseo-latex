@@ -351,6 +351,11 @@ export const ja: TranslationResources = {
     attachments: {
       dismissImage: "画像を閉じる",
       closeImage: "画像を閉じる",
+      sharedLoadFailed: "共有添付ファイルを読み込めません：{{error}}",
+      sharedSaveFailed: "添付ファイルをホストに保存できません：{{error}}",
+      sharedLoading: "添付ファイルを読み込み中…",
+      sharedHostRequired: "添付ファイルを共有するには公式ホストを更新してください。",
+      sharedImagesMissing: "添付画像を読み込めません。追加し直してから送信してください。",
       imageLoadFailed: "画像を読み込めませんでした",
       imageUnavailable: "画像が利用できません",
       imagePreviewUnavailable: "画像プレビューは利用できません。",

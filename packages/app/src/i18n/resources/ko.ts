@@ -347,6 +347,11 @@ export const ko: TranslationResources = {
     attachments: {
       dismissImage: "이미지 닫기",
       closeImage: "이미지 닫기",
+      sharedLoadFailed: "공유 첨부 파일을 불러올 수 없습니다: {{error}}",
+      sharedSaveFailed: "호스트에 첨부 파일을 저장할 수 없습니다: {{error}}",
+      sharedLoading: "첨부 파일 불러오는 중…",
+      sharedHostRequired: "첨부 파일 공유를 사용하려면 공식 호스트를 업데이트하세요.",
+      sharedImagesMissing: "첨부 이미지를 읽을 수 없습니다. 다시 추가한 후 전송하세요.",
       imageLoadFailed: "이미지를 불러올 수 없습니다",
       imageUnavailable: "이미지를 사용할 수 없습니다",
       imagePreviewUnavailable: "이미지 미리보기를 사용할 수 없습니다.",

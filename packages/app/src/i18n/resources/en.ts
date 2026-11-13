@@ -361,6 +361,11 @@ export const en = {
     attachments: {
       dismissImage: "Dismiss image",
       closeImage: "Close image",
+      sharedLoadFailed: "Couldn't load shared attachments: {{error}}",
+      sharedSaveFailed: "Couldn't save attachments to the host: {{error}}",
+      sharedLoading: "Loading attachments…",
+      sharedHostRequired: "Update the official host to enable shared attachments.",
+      sharedImagesMissing: "An attached image is unavailable. Add it again before sending.",
       imageLoadFailed: "Couldn't load image",
       imageUnavailable: "Image unavailable",
       imagePreviewUnavailable: "Image preview unavailable.",

@@ -62,3 +62,15 @@
 - [x] 2026-11-13 发布 `0.15.4-r2`（[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.4-r2) / [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.4-r2)）与回移修复的 `0.15.3-r3`（[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.3-r3) / [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.3-r3)）。两版均提供 Windows x64、Android ARM64、更新清单和校验文件；最新更新目标保持 `0.15.4-r2`，旧维护版不提升为 latest。
 - 验证：[0.15.4-r2 构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43394256955) 通过 566 项检查，[0.15.3-r3 构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43394261116) 通过 344 项检查；两份实际 EXE 内的更新器代码与修复构建一致，并在真实 Electron 中通过首次请求、完整下载及损坏拒绝检查。Android 两版沿用原证书，版本码分别为 `1500402`、`1500303`。[新版镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/43400949547) 与 [维护版镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/43401935132) 校验全部公开附件；客户端和 Windows 清单确认从 `0.15.3-r3` 升级到 `0.15.4-r2`，且发布维护版后 latest 未回退。
 - [ ] 用户在 Windows 手动覆盖安装 `0.15.3-r3` 后，实测通过 CNB 更新到 `0.15.4-r2`。已安装的错误更新器不能靠服务端替换清单修复；Android 不受该初始化问题影响。
+
+## LATEX-006：兼容官方 Host 的跨设备聊天附件
+
+- 反馈与实施日期：2026-11-13。
+- 用户反馈：同一个 Host、同一个 Codex 会话，本机发出的图片和其他附件在另一台设备上只剩文字。Host 使用官方桌面客户端及 CLI，要求保留官方 Host。
+- 代码排查：用户消息协议和 Codex 历史适配只输出文字与消息 ID，原发送端依赖本地附件缓存；这能解释现象，不代表 Codex 未收到图片。
+- [x] 只修改个人客户端，复用官方文件接口保存附件和消息索引；覆盖普通发送、新建会话首条消息及队列发送。
+- [x] 第二台客户端按消息 ID 恢复缩略图、文件预览入口；重连和历史重新加载后仍可读取。
+- [x] 原发送端打开旧消息时补存仍可读取的附件；缓存已丢失的旧附件不承诺恢复。
+- 验证：附件、发送及翻译定向单测共 95 项通过；普通会话与新建会话的独立浏览器验证通过，覆盖第二端无本地消息/图片缓存、放大图片、刷新和文件预览入口。未修改的官方 npm Host `0.15.4` 已验证双客户端读取及重启恢复；全仓库 lint、App 类型检查通过。
+- 构建与发布：计划 `0.15.4-r3`，沿用原 Windows / Android 应用身份与签名；以对应 Actions 结果和 Release 为准。未进行 Windows、Android 真机操作验证。
+- 存储位置、兼容边界及保留策略见 [共享聊天附件](latex-client.md#shared-chat-attachments-with-official-hosts)。

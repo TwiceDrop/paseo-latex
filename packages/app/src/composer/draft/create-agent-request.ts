@@ -1,3 +1,4 @@
+import { shareMessageAttachments } from "@/attachments/shared-message-runtime";
 import type { AgentSessionConfig } from "@getpaseo/protocol/agent-types";
 import type { AgentSnapshotPayload, CreateAgentRequestMessage } from "@getpaseo/protocol/messages";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
@@ -22,6 +23,12 @@ export async function requestWorkspaceDraftAgent(
   request: WorkspaceDraftAgentRequest,
 ): Promise<AgentSnapshotPayload> {
   const images = await encodeImages(request.images);
+  await shareMessageAttachments(client, {
+    clientMessageId: request.clientMessageId,
+    images: request.images,
+    encodedImages: images,
+    attachments: request.attachments,
+  });
   return await client.createAgent({
     config: request.config,
     workspaceId: request.workspaceId,

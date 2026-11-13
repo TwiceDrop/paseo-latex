@@ -1,3 +1,4 @@
+import { shareMessageAttachments } from "@/attachments/shared-message-runtime";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Keyboard, ScrollView, StyleSheet as RNStyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -175,6 +176,12 @@ async function submitDraftCreateRequest(input: {
 
   const attachmentsArray = Array.isArray(attachments) ? attachments : undefined;
   const imagesData = await encodeImages(images);
+  await shareMessageAttachments(client, {
+    clientMessageId: attempt.clientMessageId,
+    images,
+    encodedImages: imagesData,
+    attachments: attachmentsArray,
+  });
   const options = {
     idempotencyKey: input.draftId,
     config,

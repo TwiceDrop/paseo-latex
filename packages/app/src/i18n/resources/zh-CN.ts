@@ -364,6 +364,11 @@ export const zhCN: TranslationResources = {
     attachments: {
       dismissImage: "关闭图片",
       closeImage: "关闭图片",
+      sharedLoadFailed: "无法加载共享附件：{{error}}",
+      sharedSaveFailed: "无法将附件保存到 Host：{{error}}",
+      sharedLoading: "正在加载附件…",
+      sharedHostRequired: "请更新官方 Host，以启用附件共享。",
+      sharedImagesMissing: "部分图片已无法读取，请重新添加后发送。",
       imageLoadFailed: "无法加载图片",
       imageUnavailable: "图片不可用",
       imagePreviewUnavailable: "图片预览不可用。",

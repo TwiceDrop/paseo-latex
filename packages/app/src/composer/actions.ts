@@ -1,3 +1,7 @@
+import {
+  shareMessageAttachments,
+  type SharedMessageClient,
+} from "@/attachments/shared-message-runtime";
 import type { SelectedFile } from "@/attachments/selected-file";
 import { FILE_UPLOAD_MAX_BYTES } from "@/attachments/upload-limit";
 import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
@@ -45,7 +49,7 @@ export interface AttachmentPersister {
   deleteAttachments: (metadata: AttachmentMetadata[]) => Promise<void> | void;
 }
 
-export interface ComposerSendClient {
+export interface ComposerSendClient extends SharedMessageClient {
   sendAgentMessage: (
     agentId: string,
     text: string,
@@ -124,7 +128,7 @@ export async function pickAndPersistImages(input: {
 }
 
 export async function uploadFileAttachments(input: {
-  client: ComposerSendClient;
+  client: Pick<ComposerSendClient, "uploadFile">;
   files: SelectedFile[];
 }): Promise<Extract<ComposerAttachment, { kind: "file" }>[]> {
   const result: Extract<ComposerAttachment, { kind: "file" }>[] = [];
@@ -219,6 +223,12 @@ export async function dispatchComposerAgentMessage(
   input.submission.begin(input.agentId, userMessage);
   try {
     const imagesData = await input.encodeImages(wirePayload.images);
+    await shareMessageAttachments(input.client, {
+      clientMessageId,
+      images: wirePayload.images,
+      encodedImages: imagesData,
+      attachments: wirePayload.attachments,
+    });
     await input.client.sendAgentMessage(input.agentId, input.text, {
       messageId: clientMessageId,
       ...(input.activeTurnBehavior ? { activeTurnBehavior: input.activeTurnBehavior } : {}),

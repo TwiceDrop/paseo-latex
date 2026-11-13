@@ -17,6 +17,7 @@ import {
   expectComposerEditable,
   expectAttachButtonDisabled,
   fillComposerDraft,
+  submitMessage,
   dropFileOnComposer,
   sendDraftToQueue,
   expectQueuedMessageButton,
@@ -309,4 +310,211 @@ test.describe("Composer attachments", () => {
       await workspace.cleanup();
     }
   });
+});
+
+for (const mode of ["existing chat", "initial prompt"] as const) {
+  test(`shared attachments survive a second device and a fresh history load: ${mode}`, async ({
+    page,
+    browser,
+  }, testInfo) => {
+    test.setTimeout(180_000);
+    const agent = await startRunningMockAgent(page, {
+      prefix: "shared-attachments-",
+      model: "ten-second-stream",
+      prompt: "Ready for shared attachments.",
+    });
+    let second: Awaited<ReturnType<typeof browser.newContext>> | undefined;
+    try {
+      await expectAgentIdle(page, 30_000);
+      if (mode === "initial prompt") {
+        await clickNewChat(page);
+        await expectComposerVisible(page);
+      }
+      await attachImageFromMenu(page, TEST_IMAGE);
+      await attachFileFromMenu(page, TEST_JSON);
+      await expectAttachmentPill(page, "composer-file-attachment-pill");
+      await submitMessage(page, "Shared image and file across devices");
+      await expectComposerDraft(page, "");
+      await expectAgentIdle(page, 30_000);
+      await expect(
+        page.getByRole("button", { name: "Open file: config.json", exact: true }),
+      ).toBeVisible();
+      let targetAgentId = agent.agentId;
+      if (mode === "initial prompt") {
+        await expect
+          .poll(async () => {
+            targetAgentId =
+              (await agent.client.fetchAgents()).entries.find(
+                (entry) => entry.agent.id !== agent.agentId,
+              )?.agent.id ?? "";
+            return targetAgentId;
+          })
+          .toBeTruthy();
+      }
+      const receiverUrl = new URL(page.url());
+      receiverUrl.searchParams.set("open", `agent:${targetAgentId}`);
+      const url = receiverUrl.href;
+      const entries = await page.evaluate(() =>
+        [
+          "@paseo:daemon-registry",
+          "@paseo:create-agent-preferences",
+          "@paseo:app-settings",
+          "@paseo:onboarding",
+          "@paseo:e2e",
+        ].map((name) => ({ name, value: localStorage.getItem(name)! })),
+      );
+      // Only pairing/preferences cross this boundary: no drafts, message cache, cookies or IndexedDB.
+      second = await browser.newContext({
+        storageState: {
+          cookies: [],
+          origins: [{ origin: new URL(url).origin, localStorage: entries }],
+        },
+      });
+      const receiver = await second.newPage();
+      const diagnostics: string[] = [];
+      receiver.on("console", (m) => {
+        if (m.type() === "error") diagnostics.push(m.text());
+      });
+      receiver.on("websocket", (ws) => {
+        ws.on("framesent", (frame) => {
+          if (typeof frame.payload === "string" && frame.payload.includes("file_explorer_request"))
+            diagnostics.push(`send ${frame.payload}`);
+        });
+        ws.on("framereceived", (frame) => {
+          if (typeof frame.payload === "string" && frame.payload.includes("file_explorer_response"))
+            diagnostics.push(`receive ${frame.payload}`);
+        });
+      });
+      receiver.on("close", () => {
+        void testInfo.attach("receiver-file-requests", {
+          body: diagnostics.join("\n"),
+          contentType: "text/plain",
+        });
+      });
+      await receiver.goto(url);
+      await receiver.bringToFront();
+      await expectComposerVisible(receiver);
+      await expect(
+        receiver
+          .locator('[data-message-text="true"]')
+          .filter({ hasText: "Shared image and file across devices" }),
+      ).toBeVisible();
+      await expect(
+        receiver.getByRole("button", { name: "Open image attachment", exact: true }),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        receiver.getByRole("button", { name: "Open file: config.json", exact: true }),
+      ).toBeVisible();
+      await receiver.getByRole("button", { name: "Open image attachment", exact: true }).click();
+      await expect(receiver.getByTestId("attachment-lightbox")).toBeVisible();
+      await expect
+        .poll(() =>
+          receiver
+            .getByTestId("attachment-lightbox")
+            .locator("img")
+            .evaluateAll((images) => {
+              for (const image of images) {
+                if ((image as HTMLImageElement).naturalWidth > 0) return true;
+              }
+              return false;
+            }),
+        )
+        .toBe(true);
+      await closeImageLightbox(receiver);
+      await expectAgentIdle(receiver, 30_000);
+      await receiver
+        .getByRole("button", { name: "Open image attachment", exact: true })
+        .scrollIntoViewIfNeeded();
+      await receiver.screenshot({ path: testInfo.outputPath("second-device-attachments.png") });
+      await receiver.reload();
+      await expect(
+        receiver.getByRole("button", { name: "Open image attachment", exact: true }),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        receiver.getByRole("button", { name: "Open file: config.json", exact: true }),
+      ).toBeVisible();
+      await expect(receiver.getByTestId("shared-attachments-error")).toHaveCount(0);
+      await receiver.getByRole("button", { name: "Open file: config.json", exact: true }).click();
+      await expect(
+        receiver.getByTestId("file-panel-download").filter({ visible: true }),
+      ).toBeEnabled();
+    } finally {
+      await second?.close().catch(() => undefined);
+      await agent.cleanup();
+    }
+  });
+}
+
+test("shared attachment files survive an unmodified official 0.15.4 host restart", async () => {
+  test.setTimeout(300_000);
+  const { createHash, randomUUID } = await import("node:crypto");
+  const { startIsolatedHostDaemon } = await import("../support/helpers/isolated-host-daemon");
+  const { connectDaemonClient } = await import("../support/helpers/daemon-client-loader");
+  const { build } = await import("esbuild");
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { pathToFileURL } = await import("node:url");
+  const path = await import("node:path");
+  const bundleDirectory = await mkdtemp(path.join(tmpdir(), "paseo-shared-test-bundle-"));
+  const bundle = path.join(bundleDirectory, "store.mjs");
+  await build({
+    entryPoints: [path.resolve(__dirname, "../../src/attachments/shared-message-store.ts")],
+    outfile: bundle,
+    bundle: true,
+    platform: "node",
+    format: "esm",
+  });
+  const { createSharedMessageStore } = (await import(
+    pathToFileURL(bundle).href
+  )) as typeof import("../../src/attachments/shared-message-store");
+  const host = await startIsolatedHostDaemon(`srv_official_${randomUUID()}`, {
+    publishedVersion: "0.15.4",
+  });
+  const clients: import("@getpaseo/client/internal/daemon-client").DaemonClient[] = [];
+  try {
+    const connect = async () => {
+      const client = await connectDaemonClient<
+        import("@getpaseo/client/internal/daemon-client").DaemonClient
+      >({ clientIdPrefix: "shared-attachments", port: host.port });
+      clients.push(client);
+      return client;
+    };
+    const sender = await connect();
+    expect(sender.getLastServerInfoMessage()?.version).toBe("0.15.4");
+    const options = {
+      home: host.paseoHome,
+      serverId: host.serverId,
+      digest: async (text: string) => createHash("sha256").update(text).digest("hex"),
+    };
+    const uploaded = await sender.uploadFile({
+      fileName: TEST_JSON.name,
+      mimeType: TEST_JSON.mimeType,
+      bytes: TEST_JSON.buffer,
+    });
+    expect(uploaded.error).toBeNull();
+    const input = {
+      clientMessageId: "cross-device-official",
+      images: [
+        { data: MINIMAL_PNG.toString("base64"), mimeType: "image/png", fileName: "图片.png" },
+      ],
+      attachments: [uploaded.file!],
+    };
+    const saved = await createSharedMessageStore(sender, options).save(input);
+    const second = await connect();
+    expect(await createSharedMessageStore(second, options).read(input)).toEqual(saved);
+    await sender.close();
+    await second.close();
+    await host.restart();
+    const restoredClient = await connect();
+    const restored = await createSharedMessageStore(restoredClient, options).read(input);
+    expect(restored).toEqual(saved);
+    const image = await restoredClient.readFile(host.paseoHome, restored!.images[0]!.path);
+    expect(Buffer.from(image.bytes)).toEqual(MINIMAL_PNG);
+    const file = await restoredClient.readFile(host.paseoHome, uploaded.file!.path);
+    expect(Buffer.from(file.bytes)).toEqual(TEST_JSON.buffer);
+  } finally {
+    await Promise.all(clients.map((client) => client.close()));
+    await host.close();
+    await rm(bundleDirectory, { recursive: true, force: true });
+  }
 });

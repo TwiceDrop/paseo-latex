@@ -346,6 +346,11 @@ export const ar: TranslationResources = {
     attachments: {
       dismissImage: "تجاهل الصورة",
       closeImage: "إغلاق الصورة",
+      sharedLoadFailed: "تعذّر تحميل المرفقات المشتركة: {{error}}",
+      sharedSaveFailed: "تعذّر حفظ المرفقات على المضيف: {{error}}",
+      sharedLoading: "جارٍ تحميل المرفقات…",
+      sharedHostRequired: "حدّث المضيف الرسمي لتفعيل مشاركة المرفقات.",
+      sharedImagesMissing: "إحدى الصور المرفقة غير متاحة. أضفها مجددًا قبل الإرسال.",
       imageLoadFailed: "تعذر تحميل الصورة",
       imageUnavailable: "الصورة غير متاحة",
       imagePreviewUnavailable: "معاينة الصورة غير متاحة.",

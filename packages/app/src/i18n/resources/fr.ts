@@ -351,6 +351,11 @@ export const fr: TranslationResources = {
     attachments: {
       dismissImage: "Ignorer l’image",
       closeImage: "Fermer l’image",
+      sharedLoadFailed: "Impossible de charger les pièces jointes partagées : {{error}}",
+      sharedSaveFailed: "Impossible d’enregistrer les pièces jointes sur l’hôte : {{error}}",
+      sharedLoading: "Chargement des pièces jointes…",
+      sharedHostRequired: "Mettez à jour l’hôte officiel pour partager les pièces jointes.",
+      sharedImagesMissing: "Une image jointe est indisponible. Ajoutez-la à nouveau avant l’envoi.",
       imageLoadFailed: "Impossible de charger l’image",
       imageUnavailable: "Image indisponible",
       imagePreviewUnavailable: "Aperçu de l’image indisponible.",

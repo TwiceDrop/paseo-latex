@@ -350,6 +350,12 @@ export const ru: TranslationResources = {
     attachments: {
       dismissImage: "Закрыть изображение",
       closeImage: "Закрыть изображение",
+      sharedLoadFailed: "Не удалось загрузить общие вложения: {{error}}",
+      sharedSaveFailed: "Не удалось сохранить вложения на хосте: {{error}}",
+      sharedLoading: "Загрузка вложений…",
+      sharedHostRequired: "Обновите официальный хост для обмена вложениями.",
+      sharedImagesMissing:
+        "Прикреплённое изображение недоступно. Добавьте его заново перед отправкой.",
       imageLoadFailed: "Не удалось загрузить изображение",
       imageUnavailable: "Изображение недоступно",
       imagePreviewUnavailable: "Предварительный просмотр изображения недоступен.",

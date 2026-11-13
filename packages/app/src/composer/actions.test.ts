@@ -1,4 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { createSharedMessageTestClient } from "@/attachments/test-shared-message-client";
+vi.mock("expo-crypto", async () => {
+  const { createHash } = await import("node:crypto");
+  return {
+    CryptoDigestAlgorithm: { SHA256: "SHA-256" },
+    digestStringAsync: async (_algorithm: string, text: string) =>
+      createHash("sha256").update(text).digest("hex"),
+  };
+});
+const sharedHomes: string[] = [];
+afterEach(() => {
+  for (const home of sharedHomes.splice(0)) rmSync(home, { recursive: true, force: true });
+});
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentAttachment, ForgeSearchItem } from "@getpaseo/protocol/messages";
 import type {
   AttachmentMetadata,
@@ -190,7 +205,14 @@ function createFakeSendClient(
   options: { rejection?: Error; beforeRejection?: (call: FakeSendCall) => void } = {},
 ): ComposerSendClient & { calls: FakeSendCall[] } {
   const calls: FakeSendCall[] = [];
+  const home = mkdtempSync(`${tmpdir()}/paseo-composer-shared-`);
+  sharedHomes.push(home);
   return {
+    ...createSharedMessageTestClient(home),
+    getLastServerInfoMessage: () => ({
+      serverId: "test-host",
+      features: { workspaceFileEditing: true, canonicalSubmittedPrompts: true },
+    }),
     calls,
     sendAgentMessage: async (agentId, text, opts) => {
       const call = { agentId, text, options: opts };
@@ -200,7 +222,6 @@ function createFakeSendClient(
         throw options.rejection;
       }
     },
-    uploadFile: async () => ({ requestId: "test", file: null, error: null }),
   };
 }
 
@@ -419,6 +440,61 @@ describe("pickAndPersistImages", () => {
 });
 
 describe("dispatchComposerAgentMessage", () => {
+  it("does not send a prompt when the host cannot persist its shared attachments", async () => {
+    const client = createFakeSendClient();
+    client.writeFile = async () => {
+      throw new Error("Disk full");
+    };
+    const stream = createFakeStream();
+    await expect(
+      dispatchComposerAgentMessage({
+        client,
+        agentId: "agent",
+        text: "keep this draft",
+        attachments: [{ kind: "image", metadata: imageWithId("image") }],
+        encodeImages: passthroughEncodeImages,
+        submission: stream,
+      }),
+    ).rejects.toThrow("Disk full");
+    expect(client.calls).toHaveLength(0);
+    expect(stream.tail.get("agent") ?? []).toEqual([]);
+  });
+
+  it("does not silently send a prompt when an image has disappeared from local storage", async () => {
+    const client = createFakeSendClient();
+    const stream = createFakeStream();
+    await expect(
+      dispatchComposerAgentMessage({
+        client,
+        agentId: "agent",
+        text: "keep my image",
+        attachments: [{ kind: "image", metadata: imageWithId("missing") }],
+        encodeImages: async () => [],
+        submission: stream,
+      }),
+    ).rejects.toThrow();
+    expect(client.calls).toHaveLength(0);
+    expect(stream.tail.get("agent") ?? []).toEqual([]);
+  });
+
+  it("sends plain text without consulting the shared file store or requiring file capabilities", async () => {
+    const client = createFakeSendClient();
+    client.getLastServerInfoMessage = () => ({ serverId: "older-host" });
+    const read = vi.spyOn(client, "readFile");
+    const upload = vi.spyOn(client, "uploadFile");
+    await dispatchComposerAgentMessage({
+      client,
+      agentId: "agent",
+      text: "plain text",
+      attachments: [],
+      encodeImages: async () => [],
+      submission: createFakeStream(),
+    });
+    expect(client.calls).toHaveLength(1);
+    expect(read).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
+  });
+
   it("forwards the configured active-turn intent without provider capability checks", async () => {
     const client = createFakeSendClient();
     const stream = createFakeStream();
@@ -1056,7 +1132,6 @@ describe("file upload preparation", () => {
     const sent: string[] = [];
     const upload = uploadFileAttachments({
       client: {
-        sendAgentMessage: async () => {},
         uploadFile: async (file) => {
           sent.push(file.fileName);
           expect(file.bytes).toEqual(new Uint8Array([1, 2]));
@@ -1096,7 +1171,6 @@ describe("file upload preparation", () => {
       await expect(
         uploadFileAttachments({
           client: {
-            sendAgentMessage: async () => {},
             uploadFile: async () => {
               sends++;
               throw new Error("unexpected send");

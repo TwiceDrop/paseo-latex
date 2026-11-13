@@ -351,6 +351,12 @@ export const es: TranslationResources = {
     attachments: {
       dismissImage: "Descartar imagen",
       closeImage: "Cerrar imagen",
+      sharedLoadFailed: "No se pudieron cargar los adjuntos compartidos: {{error}}",
+      sharedSaveFailed: "No se pudieron guardar los adjuntos en el host: {{error}}",
+      sharedLoading: "Cargando adjuntos…",
+      sharedHostRequired: "Actualiza el host oficial para compartir adjuntos.",
+      sharedImagesMissing:
+        "Una imagen adjunta no está disponible. Vuelve a añadirla antes de enviar.",
       imageLoadFailed: "No se pudo cargar la imagen",
       imageUnavailable: "Imagen no disponible",
       imagePreviewUnavailable: "Vista previa de la imagen no disponible.",

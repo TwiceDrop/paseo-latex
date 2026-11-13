@@ -1,13 +1,7 @@
+import { UserMessageAttachments } from "./user-message/attachments";
 import { MessagePreview, MessageSender } from "@/components/user-message";
 import { useStableEvent } from "@/hooks/use-stable-event";
-import { getAgentAttachmentPillContent } from "@/attachments/attachment-pill-content";
 import { AssistantForkMenu, type AssistantForkTarget } from "@/components/assistant-fork-menu";
-import { AttachmentLightbox, type ImageLightboxSource } from "@/components/attachment-lightbox";
-import {
-  AttachmentFrame,
-  AttachmentLabel,
-  AttachmentThumbnail,
-} from "@/components/attachment-pill";
 import { MarkdownRenderer } from "@/components/markdown/renderer";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { RewindMenu, type RewindMode } from "@/components/rewind/rewind-menu";
@@ -95,6 +89,7 @@ interface UserMessageProps {
   serverId?: string;
   agentId?: string;
   messageId?: string;
+  clientMessageId?: string;
   message: string;
   images?: UserMessageImageAttachment[];
   attachments?: AgentAttachment[];
@@ -330,19 +325,6 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
         }
       : {}),
   },
-  imagePreviewContainer: {
-    flexDirection: "row",
-    gap: theme.spacing[2],
-    flexWrap: "wrap",
-  },
-  attachmentPreviewContainer: {
-    flexDirection: "row",
-    gap: theme.spacing[2],
-    flexWrap: "wrap",
-  },
-  imagePreviewSpacing: {
-    marginBottom: theme.spacing[2],
-  },
   copyButton: {
     alignSelf: "center",
     padding: theme.spacing[1],
@@ -370,23 +352,6 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
   },
 }));
 
-interface UserMessageImagePillProps {
-  image: UserMessageImageAttachment;
-  onOpen: (image: UserMessageImageAttachment) => void;
-  accessibilityLabel: string;
-}
-
-function UserMessageImagePill({ image, onOpen, accessibilityLabel }: UserMessageImagePillProps) {
-  const handlePress = useCallback(() => {
-    onOpen(image);
-  }, [onOpen, image]);
-  return (
-    <AttachmentFrame onPress={handlePress} accessibilityLabel={accessibilityLabel}>
-      <AttachmentThumbnail metadata={image} />
-    </AttachmentFrame>
-  );
-}
-
 const MESSAGE_TEXT_DATASET = { messageText: "true" };
 
 export const UserMessage = memo(function UserMessage({
@@ -394,6 +359,7 @@ export const UserMessage = memo(function UserMessage({
   serverId,
   agentId,
   messageId,
+  clientMessageId,
   message,
   images = [],
   attachments = [],
@@ -408,16 +374,8 @@ export const UserMessage = memo(function UserMessage({
   const isCompact = useIsCompactFormFactor();
   const { t } = useTranslation();
   const [isHovered, setIsHovered] = useState(false);
-  const [lightboxMetadata, setLightboxMetadata] = useState<UserMessageImageAttachment | null>(null);
-  const handleLightboxClose = useCallback(() => setLightboxMetadata(null), []);
-  const lightboxSource = useMemo<ImageLightboxSource | null>(
-    () => (lightboxMetadata ? { type: "attachment", metadata: lightboxMetadata } : null),
-    [lightboxMetadata],
-  );
   const resolvedDisableOuterSpacing = useDisableOuterSpacing(disableOuterSpacing);
   const hasText = message.trim().length > 0;
-  const hasImages = images.length > 0;
-  const hasAttachments = attachments.length > 0;
   const showTrailingRow = !isPending && hasText && (isCompact || isNative || isHovered);
   const formattedTimestamp = useMemo(
     () => formatMessageTimestamp(new Date(timestamp)),
@@ -446,20 +404,6 @@ export const UserMessage = memo(function UserMessage({
     ],
     [resolvedDisableOuterSpacing, isFirstInGroup, isLastInGroup],
   );
-  const imagePreviewContainerStyle = useMemo(
-    () => [
-      userMessageStylesheet.imagePreviewContainer,
-      hasText || hasAttachments ? userMessageStylesheet.imagePreviewSpacing : undefined,
-    ],
-    [hasAttachments, hasText],
-  );
-  const attachmentPreviewContainerStyle = useMemo(
-    () => [
-      userMessageStylesheet.attachmentPreviewContainer,
-      hasText ? userMessageStylesheet.imagePreviewSpacing : undefined,
-    ],
-    [hasText],
-  );
   const trailingRowStyle = useMemo(
     () => [
       userMessageStylesheet.trailingRow,
@@ -480,36 +424,16 @@ export const UserMessage = memo(function UserMessage({
         {sender ? <MessageSender sender={sender} serverId={serverId} /> : null}
         <View style={userMessageStylesheet.bubble}>
           <MessagePreview>
-            {hasImages ? (
-              <View style={imagePreviewContainerStyle}>
-                {images.map((image) => (
-                  <UserMessageImagePill
-                    key={image.id}
-                    image={image}
-                    onOpen={setLightboxMetadata}
-                    accessibilityLabel={t("composer.attachments.openImage")}
-                  />
-                ))}
-              </View>
-            ) : null}
-            {hasAttachments ? (
-              <View style={attachmentPreviewContainerStyle}>
-                {attachments.map((attachment, index) => {
-                  const content = getAgentAttachmentPillContent(attachment, t);
-                  return (
-                    <AttachmentFrame
-                      key={`${attachment.type}:${"number" in attachment ? attachment.number : index}`}
-                    >
-                      <AttachmentLabel
-                        icon={content.icon}
-                        title={content.title}
-                        subtitle={content.subtitle}
-                      />
-                    </AttachmentFrame>
-                  );
-                })}
-              </View>
-            ) : null}
+            <UserMessageAttachments
+              client={client}
+              serverId={serverId}
+              agentId={agentId}
+              clientMessageId={clientMessageId}
+              messageId={messageId}
+              images={images}
+              attachments={attachments}
+              isPending={isPending}
+            />
             {hasText ? (
               <Text selectable style={userMessageStylesheet.text} dataSet={MESSAGE_TEXT_DATASET}>
                 {message}
@@ -542,7 +466,6 @@ export const UserMessage = memo(function UserMessage({
           </View>
         ) : null}
       </View>
-      <AttachmentLightbox source={lightboxSource} onClose={handleLightboxClose} />
     </View>
   );
 });

@@ -141,3 +141,155 @@ describe("attachment service", () => {
     expect(garbageCollections).toEqual([["assistant-preview"]]);
   });
 });
+
+describe("shared message attachments on an official host", () => {
+  it("restores an image and file on a fresh client with no sender cache", async () => {
+    const { mkdtemp, readFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { createHash } = await import("node:crypto");
+    const { createSharedMessageTestClient } = await import("./test-shared-message-client");
+    const { createSharedMessageStore } = await import("./shared-message-store");
+    const home = await mkdtemp(`${tmpdir()}/paseo-shared-attachments-`);
+    const options = {
+      home,
+      serverId: "official-host",
+      digest: async (text: string) => createHash("sha256").update(text).digest("hex"),
+    };
+    try {
+      const sender = createSharedMessageTestClient(home);
+      const file = await sender.uploadFile({
+        fileName: "报告.txt",
+        mimeType: "text/plain",
+        bytes: Buffer.from("attachment contents"),
+      });
+      expect(file.error).toBeNull();
+      const saved = await createSharedMessageStore(sender, options).save({
+        clientMessageId: "draft:initial-message",
+        images: [{ data: "AQIDBA==", mimeType: "image/png", fileName: "图片.png" }],
+        attachments: [file.file!],
+      });
+      const receiver = createSharedMessageStore(createSharedMessageTestClient(home), options);
+      const restored = await receiver.read({ clientMessageId: "draft:initial-message" });
+      expect(restored).toEqual(saved);
+      expect(await readFile(restored!.images[0]!.path)).toEqual(Buffer.from([1, 2, 3, 4]));
+      expect(restored!.attachments).toEqual([file.file]);
+      expect(await readFile(file.file!.path, "utf8")).toBe("attachment contents");
+      await receiver.bind(restored!, "agent-1", "provider-message-1");
+      expect(
+        await createSharedMessageStore(createSharedMessageTestClient(home), options).read({
+          agentId: "agent-1",
+          messageId: "provider-message-1",
+        }),
+      ).toEqual(saved);
+      expect(
+        await receiver.read({ agentId: "agent-2", messageId: "provider-message-1" }),
+      ).toBeNull();
+      expect(
+        await createSharedMessageStore(sender, { ...options, serverId: "other-host" }).read({
+          clientMessageId: "draft:initial-message",
+        }),
+      ).toBeNull();
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("shared attachment persistence failures", () => {
+  it("keeps simultaneous sends separate and rejects a changed retry", async () => {
+    const { mkdtemp, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { createHash } = await import("node:crypto");
+    const { createSharedMessageTestClient } = await import("./test-shared-message-client");
+    const { createSharedMessageStore } = await import("./shared-message-store");
+    const home = await mkdtemp(`${tmpdir()}/paseo-shared-concurrent-`);
+    const options = {
+      home,
+      serverId: "official-host",
+      digest: async (text: string) => createHash("sha256").update(text).digest("hex"),
+    };
+    try {
+      const a = createSharedMessageStore(createSharedMessageTestClient(home), options);
+      const b = createSharedMessageStore(createSharedMessageTestClient(home), options);
+      const one = {
+        clientMessageId: "one",
+        attachments: [
+          {
+            type: "text" as const,
+            mimeType: "text/plain" as const,
+            text: "first",
+            title: "one.txt",
+          },
+        ],
+      };
+      const two = {
+        clientMessageId: "two",
+        attachments: [
+          {
+            type: "text" as const,
+            mimeType: "text/plain" as const,
+            text: "second",
+            title: "two.txt",
+          },
+        ],
+      };
+      const [savedOne, savedTwo] = await Promise.all([a.save(one), b.save(two)]);
+      expect(await b.read(one)).toEqual(savedOne);
+      expect(await a.read(two)).toEqual(savedTwo);
+      expect(await b.save(one)).toEqual(savedOne);
+      await expect(a.save({ ...two, clientMessageId: "one" })).rejects.toThrow(
+        "different shared attachments",
+      );
+      expect(await b.read(one)).toEqual(savedOne);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("does not publish incomplete metadata and can retry after a disk write failure", async () => {
+    const { mkdtemp, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { createHash } = await import("node:crypto");
+    const { createSharedMessageTestClient } = await import("./test-shared-message-client");
+    const { createSharedMessageStore } = await import("./shared-message-store");
+    const home = await mkdtemp(`${tmpdir()}/paseo-shared-failed-`);
+    const options = {
+      home,
+      serverId: "official-host",
+      digest: async (text: string) => createHash("sha256").update(text).digest("hex"),
+    };
+    try {
+      const client = createSharedMessageTestClient(home);
+      const reader = createSharedMessageStore(client, options);
+      const failing = createSharedMessageStore(
+        { ...client, writeFile: async () => ({ status: "error", error: "Disk full" }) },
+        options,
+      );
+      const input = {
+        clientMessageId: "retry",
+        attachments: [
+          {
+            type: "text" as const,
+            mimeType: "text/plain" as const,
+            text: "keep this",
+            title: "context",
+          },
+        ],
+      };
+      await expect(failing.save(input)).rejects.toThrow("Disk full");
+      expect(await reader.read(input)).toBeNull();
+      const saved = await reader.save(input);
+      expect(await createSharedMessageStore(client, options).read(input)).toEqual(saved);
+      expect(
+        (
+          await client.listDirectory(
+            home,
+            `.paseo-latex/attachments-v1/${await options.digest(options.serverId)}`,
+          )
+        ).entries.map((e) => e.name),
+      ).toHaveLength(1);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+});
