@@ -74,6 +74,10 @@ jobs:
         run: npm run lint -- --threads=2
       - name: Check workflow contracts
         run: node --test scripts/ci-workflow.test.mjs scripts/upload-release-assets.test.mjs
+      - name: Check Claude model catalog and feature gates
+        run: |
+          node scripts/npm-retry.mjs install --prefix "$RUNNER_TEMP/paseo-test-tools" --no-audit --no-fund @anthropic-ai/claude-code@2.1.321
+          PATH="$RUNNER_TEMP/paseo-test-tools/node_modules/.bin:$PATH" npm run test:unit --workspace=@getpaseo/server -- src/server/agent/providers/claude/models.test.ts src/server/agent/providers/claude/agent.test.ts --maxWorkers=1 --bail=1
       - name: Check desktop updater behavior
         run: npm run test --workspace=@getpaseo/desktop -- src/features/auto-updater.test.ts src/features/app-update-service.test.ts --maxWorkers=1 --bail=1
       - name: Run targeted client regression tests

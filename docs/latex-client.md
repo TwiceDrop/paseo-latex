@@ -10,7 +10,7 @@ Track requested changes in the [personal client backlog](latex-backlog.md).
 
 The personal source repository is `https://github.com/TwiceDrop/paseo-latex.git`.
 Its default `main` branch includes the personal patches; `paseo-latex` is the
-maintenance branch, based on upstream `v0.15.3`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
+maintenance branch, based on upstream `v0.15.4`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
 build machines also need the native compiler prerequisites required by the target.
 
 ```sh
@@ -366,10 +366,12 @@ uses the `daemon` subdirectory and a free loopback port. Add the original host b
 IP/Tailscale to use its existing workspaces. The optional CLI installs as
 `paseo-latex`, leaving the official `paseo` command in place.
 
-Official automatic updates are disabled for this distribution. Rebuild the
-personal installer after merging upstream and increase its revision. The runtime
-version stays equal to the bundled host version; the Windows file version carries
-the revision so host management does not repeatedly restart on a version mismatch.
+Personal Windows installations use the CNB updater described in
+[Personal client updates](#personal-client-updates). Release maintainers rebuild
+after merging upstream and increase the personal revision for another delivery
+of the same upstream version. The runtime version stays equal to the bundled host
+version; the Windows file version carries the revision so host management does
+not repeatedly restart on a version mismatch.
 
 This build runs compilers sequentially and uses one Metro worker. Node heaps are
 limited to 1.5 GB, with 2 GB for the renderer export. It checks for 3 GB of free
@@ -402,7 +404,7 @@ opting into API downloads also requires the GitHub CLI.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.15.3
+npm run latex:update -- --ref v0.15.4
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,
