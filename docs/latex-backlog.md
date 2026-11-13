@@ -50,5 +50,6 @@
 - 用户要求同步官方 `v0.15.4` 并保留个人补丁。
 - [x] 合并官方发布标签 `v0.15.4`（`1c00b365c9e0b74c1580eba33d905d693125ae21`）：新增 Fable 5.2、Mythos 5.2，默认 medium 推理强度；两者要求 Claude Code ≥ 2.1.321，Mythos 5.2 仍需主机发现有效访问权限。
 - [x] 保留 LaTeX、文档预览按需加载、下载、侧边栏排序、独立应用标识及 CNB 更新器；沿用原 Android 证书和 Windows NSIS GUID。
-- [ ] 完成合并后的回归、Windows x64 与 Android ARM64 构建，发布 `0.15.4-r1` 到 GitHub 和 CNB，并验证从 `0.15.3-r2` 的版本识别与下载清单。
+- [x] 2026-11-13 完成回归与双平台构建，发布 `0.15.4-r1`：[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.4-r1) 与 [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.4-r1) 均包含 Windows x64、Android ARM64、`latest.yml` 和 `SHA256SUMS.txt`。两个安装包来自同一源码 `cd1553746c1525807d8e017a9673b6229be83ab6`；`0.15.3-r2` 用户可使用 CNB 更新器升级。
+- 验证：[发布构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43384735456) 通过 566 项定向与界面检查；本地另通过 13 项提供方集成检查。Windows 实际 EXE 的下载校验、损坏文件拒绝及包内 CNB 配置均已核对；[发布任务](https://github.com/TwiceDrop/paseo-latex/actions/runs/43389825643) 复核 Android 原证书、包名及 `versionCode=1500401`。[CNB 镜像校验](https://github.com/TwiceDrop/paseo-latex/actions/runs/43389927231) 确认四个附件上传后与公开下载的 SHA-256 均匹配 GitHub；客户端解析器识别 `0.15.4-r1`，Windows 清单为 `0.15.4-latex.1` 且 SHA-512 匹配实际 EXE，均高于上一版。
 - [ ] Windows 与 Android 真机覆盖安装、主机配对和新模型实际调用验收；自动化目录测试不能替代真实模型访问资格和设备验证。
