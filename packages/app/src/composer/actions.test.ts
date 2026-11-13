@@ -1,14 +1,6 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createSharedMessageTestClient } from "@/attachments/test-shared-message-client";
-vi.mock("expo-crypto", async () => {
-  const { createHash } = await import("node:crypto");
-  return {
-    CryptoDigestAlgorithm: { SHA256: "SHA-256" },
-    digestStringAsync: async (_algorithm: string, text: string) =>
-      createHash("sha256").update(text).digest("hex"),
-  };
-});
 const sharedHomes: string[] = [];
 afterEach(() => {
   for (const home of sharedHomes.splice(0)) rmSync(home, { recursive: true, force: true });

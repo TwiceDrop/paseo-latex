@@ -297,6 +297,10 @@ export default defineConfig({
         replacement: path.resolve(__dirname, "test-stubs/expo-clipboard.ts"),
       },
       {
+        find: /^expo-crypto$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-crypto.ts"),
+      },
+      {
         find: /^expo-linking$/,
         replacement: path.resolve(__dirname, "test-stubs/expo-linking.ts"),
       },

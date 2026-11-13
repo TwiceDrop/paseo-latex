@@ -1,4 +1,3 @@
-import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import type { AttachmentMetadata } from "./types";
 import type { AgentAttachment } from "@getpaseo/protocol/messages";
 import { i18n } from "@/i18n/i18next";
@@ -26,7 +25,11 @@ export function getSharedMessageStore(client: SharedMessageClient) {
   if (existing?.serverId === info.serverId) return existing.store;
   const store = createSharedMessageStore(client, {
     serverId: info.serverId,
-    digest: (text) => digestStringAsync(CryptoDigestAlgorithm.SHA256, text),
+    digest: async (text) => {
+      // Load the native hashing boundary only when reading or sharing attachments.
+      const { CryptoDigestAlgorithm, digestStringAsync } = await import("expo-crypto");
+      return digestStringAsync(CryptoDigestAlgorithm.SHA256, text);
+    },
   });
   stores.set(client, { serverId: info.serverId, store });
   return store;
