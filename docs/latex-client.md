@@ -93,6 +93,9 @@ downloads and hashes them before publication. It checks anonymous public downloa
 after publication as well. Explicitly mirroring an older release does not make it
 latest. A red workflow is a failed migration check, even if some refs or draft
 attachments were already copied; rerun after correcting access or network issues.
+CNB may return `tag_commitish` as `refs/tags/<tag>` for an annotated tag. The mirror
+also resolves that remote tag to its commit; a matching ref name alone is not
+enough to validate the release source.
 
 Public versioned downloads use
 `https://cnb.cool/twicedrop/paseo-latex/-/releases/download/<tag>/<filename>`.
