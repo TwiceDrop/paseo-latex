@@ -60,6 +60,8 @@ Android jobs must all succeed in that manual run, and its source must match the
 tag exactly. The publisher downloads both Actions artifacts, verifies the original
 Android certificate, application ID and version code, and generates `latest.yml`
 and `SHA256SUMS.txt` before publishing. It no longer needs an APK staging branch.
+For an older maintenance release, disable `make_latest` and explicitly mirror its
+tag with **LaTeX CNB Mirror**. This preserves the newer update target on both hosts.
 
 ## CNB source and release mirror
 
@@ -101,6 +103,10 @@ Public versioned downloads use
 `https://cnb.cool/twicedrop/paseo-latex/-/releases/download/<tag>/<filename>`.
 Clients installed before `0.15.3-r2` need one manual installation of the new
 personal installer. Copying a release cannot add an updater to an old binary.
+Windows `0.15.3-r2` and `0.15.4-r1` have an updater initialization defect that reports
+`Cannot read properties of null (reading 'request')`. Manually install a fixed
+Windows build once: `0.15.3-r3` retains the older base for upgrade testing, while
+`0.15.4-r2` is the current fixed version. The Android updater is not affected.
 
 ## Personal client updates
 
@@ -128,9 +134,11 @@ is included in a client. Android's installation permission and FileProvider are
 only added to the personal build. Keep the original signing key, package ID,
 Windows app ID and NSIS GUID when releasing later updates.
 
-The Windows build runs a real Electron check and download against a loopback
-server using the just-built installer. It also verifies that a corrupted download
-is rejected and never executes the installer during that check. Browser tests
+The Windows build exercises the factory's initial CNB provider without resetting
+its feed or executor. An isolated Electron session routes its CNB URLs to a
+loopback server serving the just-built installer; the check rejects corrupted
+downloads and never executes an installer. Resetting the feed in the old smoke
+test hid the initialization defect in the first two Windows updater releases. Browser tests
 cover the settings row through a native-operation adapter; they do not replace
 an Android device test of permission and system-installer UI.
 

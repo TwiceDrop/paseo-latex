@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createServer, request, type IncomingMessage, type RequestOptions } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NodeHttpExecutor } from "builder-util/out/nodeHttpExecutor.js";
-import { createLatexAutoUpdater, latexUpdateVersion } from "./latex-auto-updater";
+import { ElectronHttpExecutor } from "electron-updater/out/electronHttpExecutor.js";
+import {
+  createLatexAutoUpdater,
+  latexUpdateVersion,
+  LATEX_UPDATE_FEED,
+} from "./latex-auto-updater";
 
 class LoopbackUpdateExecutor extends NodeHttpExecutor {
   override createRequest(options: RequestOptions, callback: (response: IncomingMessage) => void) {
@@ -13,9 +18,9 @@ class LoopbackUpdateExecutor extends NodeHttpExecutor {
   }
 }
 
-it("checks personal revisions through the real generic update provider without downgrades", async () => {
+it("checks personal revisions through the initial CNB provider without resetting its feed", async () => {
   const directory = await mkdtemp(join(tmpdir(), "paseo-updater-"));
-  let published = "0.15.3-latex.2";
+  let published = "0.15.3-latex.3";
   const paths: string[] = [];
   const server = createServer((req, res) => {
     paths.push(req.url ?? "");
@@ -28,12 +33,23 @@ it("checks personal revisions through the real generic update provider without d
       }),
     );
   });
+  const transport = vi.spyOn(ElectronHttpExecutor.prototype, "request");
   try {
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Missing test server address");
-    const updater = createLatexAutoUpdater(2, {
-      version: latexUpdateVersion("0.15.3", 2),
+    const executor = new LoopbackUpdateExecutor();
+    // Route the initial production feed to a real local server at the HTTP boundary.
+    // Replacing the updater's executor or feed after construction concealed a null provider executor.
+    transport.mockImplementation((options, cancellationToken) => {
+      expect(options.hostname).toBe(new URL(LATEX_UPDATE_FEED).hostname);
+      return executor.request(
+        { ...options, hostname: "127.0.0.1", protocol: "http:", port: address.port },
+        cancellationToken,
+      );
+    });
+    const updater = createLatexAutoUpdater(3, {
+      version: latexUpdateVersion("0.15.3", 3),
       name: "Paseo LaTeX",
       isPackaged: true,
       appUpdateConfigPath: join(directory, "app-update.yml"),
@@ -46,31 +62,27 @@ it("checks personal revisions through the real generic update provider without d
     });
     updater.logger = null;
     updater.autoDownload = false;
-    Object.assign(updater, {
-      httpExecutor: new LoopbackUpdateExecutor(),
-      _testOnlyOptions: { platform: "win32" },
-    });
-    updater.setFeedURL({
-      provider: "generic",
-      url: `http://127.0.0.1:${address.port}`,
-      channel: "latest",
-      useMultipleRangeRequest: false,
-    });
     expect(updater.disableDifferentialDownload).toBe(true);
     expect(updater.allowDowngrade).toBe(false);
     for (const [version, available] of [
-      ["0.15.3-latex.1", false],
       ["0.15.3-latex.2", false],
-      ["0.15.3-latex.3", true],
+      ["0.15.3-latex.3", false],
+      ["0.15.3-latex.4", true],
       ["0.15.4-latex.1", true],
+      ["0.15.4-latex.2", true],
     ] as const) {
       published = version;
       const result = await updater.checkForUpdates();
       expect(result?.isUpdateAvailable).toBe(available);
     }
-    expect(paths.length).toBe(4);
-    expect(paths.every((path) => path.startsWith("/latest.yml"))).toBe(true);
+    const suffixes: Partial<Record<NodeJS.Platform, string>> = { linux: "-linux", darwin: "-mac" };
+    const suffix = suffixes[process.platform] ?? "";
+    const expectedPath = `${new URL(LATEX_UPDATE_FEED).pathname}/latest${suffix}.yml`;
+    expect(paths.map((path) => new URL(path, "http://127.0.0.1").pathname)).toEqual(
+      Array(5).fill(expectedPath),
+    );
   } finally {
+    transport.mockRestore();
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await rm(directory, { recursive: true, force: true });
