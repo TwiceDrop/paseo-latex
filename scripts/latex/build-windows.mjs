@@ -129,29 +129,45 @@ if (electronDist) {
     JSON.stringify({
       name: "paseo-latex-updater-smoke",
       version,
-      main: path.join(root, "scripts/latex/smoke-updater.cjs"),
+      main: "index.cjs",
     }),
   );
-  await new Promise((resolve, reject) => {
-    const child = spawn(path.join(electronDist, "electron.exe"), [], {
-      cwd: root,
-      env: {
-        ...env,
-        PASEO_LATEX_UPDATER_SMOKE_INSTALLER: installer,
-        PASEO_LATEX_UPDATER_SMOKE_VERSION: version,
-        PASEO_LATEX_UPDATER_SMOKE_REVISION: String(revision),
-      },
-      stdio: "inherit",
-      windowsHide: true,
+  fs.writeFileSync(
+    path.join(smokeApp, "index.cjs"),
+    `process.on("uncaughtException", error => { console.error(error); require("electron").app.exit(1); });\nrequire(${JSON.stringify(path.join(root, "scripts/latex/smoke-updater.cjs"))});\n`,
+  );
+  try {
+    await new Promise((resolve, reject) => {
+      const child = spawn(path.join(electronDist, "electron.exe"), [], {
+        cwd: root,
+        env: {
+          ...env,
+          PASEO_LATEX_UPDATER_SMOKE_INSTALLER: installer,
+          PASEO_LATEX_UPDATER_SMOKE_VERSION: version,
+          PASEO_LATEX_UPDATER_SMOKE_REVISION: String(revision),
+        },
+        stdio: "inherit",
+        windowsHide: true,
+      });
+      const timeout = setTimeout(() => {
+        child.kill();
+        reject(new Error("Windows updater smoke check timed out"));
+      }, 5 * 60_000);
+      child.on("error", (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+      child.on("exit", (code) => {
+        clearTimeout(timeout);
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        reject(new Error(`Windows updater smoke check failed (${code})`));
+      });
     });
-    child.on("error", reject);
-    child.on("exit", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      reject(new Error(`Windows updater smoke check failed (${code})`));
-    });
-  });
+  } finally {
+    fs.rmSync(smokeApp, { recursive: true, force: true });
+  }
 }
 console.log(`\nInstaller: ${installer}`);

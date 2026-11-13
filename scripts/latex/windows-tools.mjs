@@ -97,6 +97,7 @@ export async function prepareWindowsTools({
   await extract(archive, electronDist);
   // Match electron-builder's normal distribution cleanup for a custom local dist.
   await fs.rm(path.join(electronDist, "resources/default_app.asar"), { force: true });
+  await fs.rm(path.join(electronDist, "resources/app"), { recursive: true, force: true });
   await fs.rm(path.join(electronDist, "version"), { force: true });
 
   // Match electron-builder 26.8.1 / app-builder's pinned tools and cache keys.

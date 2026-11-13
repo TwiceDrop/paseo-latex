@@ -93,6 +93,8 @@ async function main() {
       updater.logger = null;
       updater.autoDownload = false;
       updater.autoInstallOnAppQuit = false;
+      // Keep the NSIS feed filename when checking this harness on Linux as well.
+      Object.assign(updater, { _testOnlyOptions: { platform: "win32" } });
       updater.setFeedURL({
         provider: "generic",
         url,
