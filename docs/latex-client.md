@@ -106,7 +106,8 @@ personal installer. Copying a release cannot add an updater to an old binary.
 Windows `0.15.3-r2` and `0.15.4-r1` have an updater initialization defect that reports
 `Cannot read properties of null (reading 'request')`. Manually install a fixed
 Windows build once: `0.15.3-r3` retains the older base for upgrade testing, while
-`0.15.4-r2` is the current fixed version. The Android updater is not affected.
+`0.15.4-r3` is the current fixed version and also adds shared chat attachments.
+The Android updater is not affected.
 
 ## Personal client updates
 

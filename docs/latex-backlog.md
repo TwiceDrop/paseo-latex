@@ -61,7 +61,7 @@
 - [x] 调整现有测试，保留首次创建的 CNB provider，不再通过重设 feed 掩盖错误。已发布 `0.15.4-r1` EXE 内的旧代码在真实 Electron 中复现同一异常；修复后通过首次检查、完整下载与损坏文件拒绝，未执行安装。
 - [x] 2026-11-13 发布 `0.15.4-r2`（[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.4-r2) / [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.4-r2)）与回移修复的 `0.15.3-r3`（[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.3-r3) / [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.3-r3)）。两版均提供 Windows x64、Android ARM64、更新清单和校验文件；最新更新目标保持 `0.15.4-r2`，旧维护版不提升为 latest。
 - 验证：[0.15.4-r2 构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43394256955) 通过 566 项检查，[0.15.3-r3 构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43394261116) 通过 344 项检查；两份实际 EXE 内的更新器代码与修复构建一致，并在真实 Electron 中通过首次请求、完整下载及损坏拒绝检查。Android 两版沿用原证书，版本码分别为 `1500402`、`1500303`。[新版镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/43400949547) 与 [维护版镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/43401935132) 校验全部公开附件；客户端和 Windows 清单确认从 `0.15.3-r3` 升级到 `0.15.4-r2`，且发布维护版后 latest 未回退。
-- [ ] 用户在 Windows 手动覆盖安装 `0.15.3-r3` 后，实测通过 CNB 更新到 `0.15.4-r2`。已安装的错误更新器不能靠服务端替换清单修复；Android 不受该初始化问题影响。
+- [ ] 用户在 Windows 手动覆盖安装 `0.15.3-r3` 后，实测通过 CNB 更新到最新版（当前 `0.15.4-r3`）。已安装的错误更新器不能靠服务端替换清单修复；Android 不受该初始化问题影响。
 
 ## LATEX-006：兼容官方 Host 的跨设备聊天附件
 
@@ -73,6 +73,8 @@
 - [x] 原发送端打开旧消息时补存仍可读取的附件；缓存已丢失的旧附件不承诺恢复。
 - 验证：附件、发送及翻译定向单测共 96 项通过；普通会话与新建会话的独立浏览器验证通过，覆盖第二端无本地消息/图片缓存、放大图片、刷新和文件预览入口。未修改的官方 npm Host `0.15.4` 已验证双客户端读取及重启恢复；全仓库 lint、App 类型检查通过。
 - Android 兼容复核：读取队列使用原生 `AbortSignal.aborted`，不调用 React Native `abort-controller` 缺少的 `throwIfAborted()`；已用该原生依赖验证正常读取、排队取消及后续队列继续执行。
-- 测试稳定性：首轮云端文件预览断言曾超时一次，重试通过；随后本地三个独立浏览器重复运行全部通过，保留此记录供后续复核。
-- 构建与发布：计划 `0.15.4-r3`，沿用原 Windows / Android 应用身份与签名；以对应 Actions 结果和 Release 为准。未进行 Windows、Android 真机操作验证。
+- 云端回归：[最终构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43430331377) 的客户端定向单测 344 项、文档与公式浏览器测试 13 项、侧边栏及文档预览端到端测试 11 项均通过；三个附件兼容用例首次通过，无需重试。Host 模型及功能门控 222 项、桌面更新器 38 项检查通过，客户端类型检查、全仓库 lint、网页导出及格式检查通过。
+- 测试稳定性：首轮云端文件预览断言曾超时一次，重试通过；随后本地三个独立浏览器重复运行及最终云端运行全部通过，保留此记录供后续复核。
+- [x] 2026-11-13 完成双平台构建并发布 `0.15.4-r3`：[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.4-r3) 与 [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.4-r3) 均提供 Windows x64、Android ARM64、更新清单和校验文件。两个安装包来自源码 `14c8b59df64ad7c321953fc338d39daf26ffe133`，沿用原应用身份及 Android 签名；[发布工作流](https://github.com/TwiceDrop/paseo-latex/actions/runs/43438105169) 已复核源码、签名和版本码。
+- 发布验证：[CNB 镜像任务](https://github.com/TwiceDrop/paseo-latex/actions/runs/43438222924) 校验四个附件上传后及公开下载的完整 SHA-256，与 GitHub 一致。实际客户端解析器确认 latest 为 `0.15.4-r3`、Android `versionCode=1500403`；Windows 清单为 `0.15.4-latex.3`，下载地址固定到本次标签。Windows 包内更新器通过真实 Electron 的首次请求、完整下载及损坏拒绝检查。未进行 Windows、Android 真机操作验证。
 - 存储位置、兼容边界及保留策略见 [共享聊天附件](latex-client.md#shared-chat-attachments-with-official-hosts)。
