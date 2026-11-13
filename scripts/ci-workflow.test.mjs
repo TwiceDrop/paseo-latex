@@ -29,6 +29,7 @@ test("CNB mirroring uses trusted main and excludes pull-request workflow complet
   assert.match(source, /cancel-in-progress: false/);
   assert.match(source, /contents: read/);
   assert.match(source, /RELEASE_TAG: \$\{\{ inputs\.release_tag \}\}/);
+  assert.match(source, /SOURCE_ONLY: \$\{\{ github\.event_name == 'push' \}\}/);
   assert.doesNotMatch(source, /run:.*\$\{\{/);
 });
 

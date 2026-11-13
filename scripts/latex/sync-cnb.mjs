@@ -57,8 +57,13 @@ export async function verifyContent(stream, expected) {
   }
 }
 
-export function publicationPatch(source, target, commit, latestTag) {
-  if (target.tag_name !== source.tag_name || target.tag_commitish !== commit) {
+export function publicationPatch(source, target, commit, mirroredCommit, latestTag) {
+  // CNB returns the tag ref for annotated tags; compare its peeled remote commit too.
+  if (
+    mirroredCommit !== commit ||
+    target.tag_name !== source.tag_name ||
+    ![commit, `refs/tags/${source.tag_name}`].includes(target.tag_commitish)
+  ) {
     throw new Error("CNB release tag does not match the GitHub source commit");
   }
   return {
@@ -178,6 +183,7 @@ async function verifyRemote(tag, asset, authenticated) {
 }
 
 function syncSource() {
+  console.log("Fetching current source branches and tags from GitHub");
   command("git", [
     "fetch",
     "origin",
@@ -199,6 +205,7 @@ function syncSource() {
   // Read the token only inside Git's credential helper, never from command arguments.
   const helper =
     '!f() { if [ "$1" = get ]; then printf "%s\\n" "username=cnb" "password=$CNB_TOKEN"; fi; }; f';
+  console.log("Pushing source history to CNB");
   command(
     "git",
     [
@@ -218,7 +225,22 @@ function syncSource() {
   );
 }
 
+function mirroredTagCommit(tag) {
+  const ref = `refs/tags/${tag}`;
+  const refs = new Map(
+    command("git", ["ls-remote", `https://cnb.cool/${cnbRepo}.git`, ref, `${ref}^{}`])
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        const [sha, name] = line.split(/\s+/);
+        return [name, sha];
+      }),
+  );
+  return refs.get(`${ref}^{}`) || refs.get(ref);
+}
+
 async function uploadAsset(releasePath, asset, directory) {
+  console.log(`Uploading ${asset.name} (${asset.size} bytes)`);
   const upload = await cnb(`${releasePath}/asset-upload-url`, {
     method: "POST",
     body: {
@@ -281,7 +303,7 @@ async function mirrorRelease(source, directory) {
       },
     });
   }
-  publicationPatch(source, target, commit, tag);
+  publicationPatch(source, target, commit, mirroredTagCommit(tag), tag);
   if (
     (target.assets || []).some((asset) => !assets.some((expected) => expected.name === asset.name))
   ) {
@@ -318,14 +340,14 @@ async function mirrorRelease(source, directory) {
   }
   await cnb(releasePath, {
     method: "PATCH",
-    body: publicationPatch(source, target, commit, latest.tag_name),
+    body: publicationPatch(source, target, commit, mirroredTagCommit(tag), latest.tag_name),
   });
   target = await cnb(`/tags/${tag}`);
   if (target.draft || target.prerelease || target.assets.length !== assets.length) {
     throw new Error("CNB publication verification failed");
   }
   for (const asset of assets) await verifyRemote(tag, asset, false);
-  const url = `https://cnb.cool/${cnbRepo}/-/releases/tag/${tag}`;
+  const url = `https://cnb.cool/${cnbRepo}/-/releases/tags/${tag}`;
   console.log(`Published and verified ${url}`);
   if (process.env.GITHUB_STEP_SUMMARY) {
     await appendFile(
@@ -337,6 +359,10 @@ async function mirrorRelease(source, directory) {
 
 async function main() {
   if (!process.env.CNB_TOKEN) throw new Error("Set the repository Actions secret CNB_TOKEN first");
+  if (process.env.SOURCE_ONLY === "true") {
+    syncSource();
+    return;
+  }
   const source = githubRelease(process.env.RELEASE_TAG || "latest");
   releaseFiles(source);
   syncSource();

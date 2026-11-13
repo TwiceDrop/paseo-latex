@@ -68,9 +68,10 @@ Signing keys and credentials must never enter that branch.
 The domestic mirror is `https://cnb.cool/twicedrop/paseo-latex`. GitHub remains the
 source used for builds. **LaTeX CNB Mirror** synchronizes `main`, `paseo-latex` and
 personal `latex-v*-r*` tags without force-pushing or deleting CNB-only references.
-It runs after a push to `main`, a published GitHub release, or a successful manual
-**LaTeX Source Build** run. The last trigger covers releases published using
-`GITHUB_TOKEN`, which do not trigger another `release` workflow.
+A push to `main` synchronizes source only. Published GitHub releases and successful
+manual **LaTeX Source Build** runs also mirror release files. The last trigger covers
+releases published using `GITHUB_TOKEN`, which do not trigger another `release`
+workflow. Ordinary source pushes do not repeatedly download large installers.
 
 Set the GitHub repository Actions secret `CNB_TOKEN` to a CNB access token scoped
 to this CNB repository with `repo-code:rw` and `repo-release:rw`. The workflow uses

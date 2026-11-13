@@ -110,11 +110,11 @@ test("CNB publication keeps tags immutable and does not promote an archived rele
   const commit = "b".repeat(40);
   const target = { tag_name: releaseFixture.tag_name, tag_commitish: commit };
   assert.equal(
-    publicationPatch(releaseFixture, target, commit, releaseFixture.tag_name).make_latest,
+    publicationPatch(releaseFixture, target, commit, commit, releaseFixture.tag_name).make_latest,
     "true",
   );
   assert.equal(
-    publicationPatch(releaseFixture, target, commit, "latex-v0.15.4-r1").make_latest,
+    publicationPatch(releaseFixture, target, commit, commit, "latex-v0.15.4-r1").make_latest,
     "false",
   );
   assert.throws(
@@ -123,8 +123,19 @@ test("CNB publication keeps tags immutable and does not promote an archived rele
         releaseFixture,
         { ...target, tag_commitish: "c".repeat(40) },
         commit,
+        commit,
         releaseFixture.tag_name,
       ),
+    /source commit/,
+  );
+  const annotated = { ...target, tag_commitish: `refs/tags/${releaseFixture.tag_name}` };
+  assert.equal(
+    publicationPatch(releaseFixture, annotated, commit, commit, releaseFixture.tag_name).draft,
+    false,
+  );
+  assert.throws(
+    () =>
+      publicationPatch(releaseFixture, annotated, commit, "c".repeat(40), releaseFixture.tag_name),
     /source commit/,
   );
 });
