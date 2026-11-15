@@ -62,18 +62,7 @@ run({
 });
 run({
   command: "npm",
-  args: ["run", "build:math-assets", "--workspace=@getpaseo/app"],
-  cwd: repoRoot,
-});
-run({
-  command: "npm",
-  args: [
-    "run",
-    "format:files",
-    "--",
-    "packages/app/src/components/markdown/math/assets.gen.ts",
-    "packages/app/src/components/markdown/math/katex.gen.css",
-  ],
+  args: ["run", "build:mermaid-runtime", "--workspace=@getpaseo/app"],
   cwd: repoRoot,
 });
 run({

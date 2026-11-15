@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mermaidRuntimeHtml } from "./html.gen";
+import mermaidRuntimeHtml from "./mermaid.gen.html?raw";
 import { parseMermaidRuntimeMessage, type MermaidRuntimeMessage } from "./messages";
 
 const mountedFrames: HTMLIFrameElement[] = [];

@@ -5,9 +5,16 @@ import { buildFilePanelSettingsRows } from "./rows";
 
 type HostedCandidate = FilePanelCandidate & { serverId?: string };
 
-const builtinMarkdown: HostedCandidate = filePanelCatalog([])[0];
-const builtinImage: HostedCandidate = filePanelCatalog([])[2];
+const builtinMarkdown: HostedCandidate = filePanelCatalog([]).find(
+  (panel) => panel.id === "builtin:markdown",
+)!;
+const builtinImage: HostedCandidate = filePanelCatalog([]).find(
+  (panel) => panel.id === "builtin:image",
+)!;
 const source: HostedCandidate = sourceFilePanel;
+const builtinDocument: HostedCandidate = filePanelCatalog([]).find(
+  (panel) => panel.id === "builtin:document",
+)!;
 
 /** What Settings reads: the built-ins and every host's plugin panels, in catalog order. */
 function catalog(...plugins: HostedCandidate[]): HostedCandidate[] {
@@ -98,7 +105,11 @@ describe("buildFilePanelSettingsRows", () => {
 
   it("keeps a remembered key whose panel is on no connected host", () => {
     expect(rows(catalog(), { "ext:pdf": "plugin:pdf-panel/pdf" })).toEqual([
-      { selectorKey: "ext:pdf", candidates: [source], associatedPanelId: "plugin:pdf-panel/pdf" },
+      {
+        selectorKey: "ext:pdf",
+        candidates: [builtinDocument],
+        associatedPanelId: "plugin:pdf-panel/pdf",
+      },
     ]);
   });
 

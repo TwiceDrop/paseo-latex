@@ -55,6 +55,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -77,7 +79,7 @@ jobs:
       - name: Lint
         run: npm run lint -- --threads=2
       - name: Check workflow contracts
-        run: node --test scripts/ci-workflow.test.mjs scripts/upload-release-assets.test.mjs
+        run: node --test scripts/ci-workflow.test.mjs scripts/upload-release-assets.test.mjs scripts/latex/patches.test.mjs
       - name: Check Claude model catalog and feature gates
         run: |
           node scripts/npm-retry.mjs install --prefix "$RUNNER_TEMP/paseo-test-tools" --no-audit --no-fund @anthropic-ai/claude-code@2.1.321
@@ -85,16 +87,16 @@ jobs:
       - name: Check desktop updater behavior
         run: npm run test --workspace=@getpaseo/desktop -- src/features/auto-updater.test.ts src/features/app-update-service.test.ts --maxWorkers=1 --bail=1
       - name: Run targeted client regression tests
-        run: npm run test --workspace=@getpaseo/app -- --project unit app.config.test.ts native-release-version.test.ts src/desktop/updates/desktop-app-updater.test.ts src/desktop/updates/desktop-updates.test.ts src/file-pane/document-preview/model.test.ts src/file-panels/catalog.test.ts src/components/markdown/renderer.test.ts src/components/markdown/math/source.test.ts src/attachments/service.test.ts src/composer/actions.test.ts src/i18n/resources.test.ts --maxWorkers=1 --bail=1
+        run: npm run latex:verify -- --suite unit
       - name: Install browser runtime
         run: npm exec -- playwright install --with-deps chromium
-      - name: Run real document and math browser regression tests
-        run: npm run test:browser --workspace=@getpaseo/app -- src/file-pane/document-preview/runtime.browser.test.ts src/components/markdown/math/enriched.browser.test.tsx src/components/settings/row-density.browser.test.tsx --maxWorkers=1
-      - name: Run sidebar and document preview regression tests
+      - name: Run real document, math and Mermaid browser regression tests
+        run: npm run latex:verify -- --suite browser
+      - name: Run navigation, document and Mermaid regression tests
         env:
           NODE_OPTIONS: --max-old-space-size=4096
           E2E_RECORD_VIDEO: "1"
-        run: npm run test:e2e --workspace=@getpaseo/app -- e2e/browser/sidebar-reorder.spec.ts e2e/browser/document-preview.spec.ts --workers=1
+        run: npm run latex:verify -- --suite e2e
       - name: Check attachments across devices and official hosts
         env:
           NODE_OPTIONS: --max-old-space-size=4096
@@ -126,6 +128,17 @@ jobs:
           name: paseo-latex-web-${{ github.sha }}
           path: packages/app/dist
           retention-days: 7
+      - name: Export and replay reusable personal patches
+        run: |
+          npm run latex:patches -- export --out artifacts/personal-patches
+          npm run latex:patches -- check --bundle artifacts/personal-patches
+      - name: Upload reusable personal patches
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paseo-latex-patches-${{ github.sha }}
+          path: artifacts/personal-patches
+          retention-days: 30
       - name: Upload formatting diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

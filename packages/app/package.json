@@ -41,8 +41,7 @@
     "build:apk": "npm --prefix ../.. run build:apk",
     "build:apk:arm64": "npm --prefix ../.. run build:apk:arm64",
     "test:android": "expo prebuild --platform android --no-install && cd android && ./gradlew :paseo-native-trace:testReleaseUnitTest :react-native-enriched-markdown:testReleaseUnitTest --tests '*InlineCodeFormattingTest' --no-daemon --max-workers=2 -Dorg.gradle.parallel=false",
-    "build:document-preview": "node ./src/file-pane/document-preview/build-runtime.mjs",
-    "build:math-assets": "node ./src/components/markdown/math/build-assets.mjs"
+    "build:document-preview": "node ./src/file-pane/document-preview/build-runtime.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "6.10.4",
@@ -134,7 +133,6 @@
     "react-native-enriched-markdown": "1.2.0-nightly-20261014-766fc0e67",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-keyboard-controller": "1.21.12",
-    "react-native-markdown-display": "^7.0.2",
     "react-native-nitro-modules": "0.35.5",
     "react-native-reanimated": "4.5.5",
     "react-native-safe-area-context": "~5.7.0",

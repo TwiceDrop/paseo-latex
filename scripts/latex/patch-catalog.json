@@ -1,0 +1,110 @@
+{
+  "upstream": {
+    "tag": "v0.15.4",
+    "commit": "1c00b365c9e0b74c1580eba33d905d693125ae21"
+  },
+  "features": [
+    {
+      "id": "math",
+      "paths": [
+        "packages/app/src/components/markdown/",
+        "packages/app/src/assistant-selection-copy/",
+        "packages/app/src/utils/assistant-markdown-parser",
+        "patches/react-native-enriched-markdown",
+        "packages/app/e2e/browser/mermaid-"
+      ],
+      "contract": "Native RaTeX / web KaTeX, streaming TeX boundaries and source copying; no Host plugin required."
+    },
+    {
+      "id": "documents",
+      "paths": [
+        "packages/app/src/file-pane/",
+        "packages/app/src/file-panels/",
+        "packages/app/src/assistant-file-links/",
+        "packages/app/src/utils/load-bundled-html",
+        "packages/app/e2e/browser/document-preview",
+        "packages/app/e2e/support/helpers/document-preview"
+      ],
+      "contract": "Offline bundled viewers, bounded memory, official Open with associations and plugin fallback."
+    },
+    {
+      "id": "downloads",
+      "paths": [
+        "packages/app/modules/paseo-file-download/",
+        "packages/app/src/downloads/",
+        "packages/app/src/hooks/use-file-download",
+        "packages/app/src/stores/download-store",
+        "packages/app/src/components/download-toast",
+        "packages/client/src/daemon-client"
+      ],
+      "contract": "Authenticated binary transfer over the existing direct/relay connection; Android Save As."
+    },
+    {
+      "id": "attachments",
+      "paths": [
+        "packages/app/src/attachments/",
+        "packages/app/src/composer/",
+        "packages/app/src/components/message.tsx",
+        "packages/app/src/components/user-message/",
+        "packages/app/src/agent-stream/view",
+        "packages/app/e2e/browser/composer-attachments"
+      ],
+      "contract": "Official Host file APIs, durable metadata before send, cross-device retrieval, bounded caches."
+    },
+    {
+      "id": "navigation",
+      "paths": [
+        "packages/app/src/components/sidebar",
+        "packages/app/src/components/floating-header/",
+        "packages/app/src/mobile-panels/",
+        "packages/app/src/panels/",
+        "packages/app/e2e/browser/sidebar-reorder",
+        "packages/app/e2e/browser/workspace-navigation"
+      ],
+      "contract": "Stable manual order, collapsed projects, mobile gesture arbitration and current-session navigation."
+    },
+    {
+      "id": "distribution",
+      "paths": [
+        "packages/app/src/updates/",
+        "packages/app/src/desktop/updates/",
+        "packages/app/modules/paseo-file-download/",
+        "packages/app/plugins/",
+        "packages/app/app.config",
+        "packages/app/native-release-version",
+        "packages/app/src/screens/settings-screen",
+        "packages/desktop/",
+        "patches/app-builder-lib",
+        ".github/workflows/latex-",
+        "scripts/latex/"
+      ],
+      "contract": "Independent identities and signing; CNB update checks, manifest hashes, reproducible Win x64 / Android builds."
+    },
+    {
+      "id": "integration",
+      "paths": [
+        ".github/",
+        "scripts/",
+        "package",
+        "packages/app/package",
+        "packages/app/metro",
+        "packages/app/global",
+        "packages/app/vitest",
+        "packages/app/test-stubs/",
+        "packages/app/e2e/support/metro",
+        "packages/app/src/polyfills/",
+        "packages/app/src/i18n/",
+        "packages/app/src/components/settings/",
+        "packages/protocol/",
+        "packages/server/",
+        "docs/",
+        "README",
+        "CLAUDE.md",
+        ".gitignore",
+        ".oxfmtrc",
+        "fastlane/"
+      ],
+      "contract": "Shared dependency pins, vendor patches, protocol compiler fixes, CI guards, localization and migration documentation. Review with feature patches."
+    }
+  ]
+}

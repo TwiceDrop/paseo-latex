@@ -11,12 +11,15 @@ import { MermaidFullscreenViewer } from "./fullscreen-viewer.web";
 import { MermaidIframeRuntime, type MermaidRenderedMessage } from "./iframe-runtime.web";
 import { useMermaidRenderModel } from "./use-render-model";
 import { getDiagramBoxStyle } from "./presentation";
+import { MermaidRuntimeResource } from "./runtime-resource";
 
 interface MermaidFenceHostImplProps extends MarkdownFenceRendererProps {
+  runtimeHtml: string;
   colorScheme?: "light" | "dark";
 }
 
 function MermaidFenceHostImpl({
+  runtimeHtml,
   code,
   phase,
   inheritedStyles,
@@ -120,6 +123,7 @@ function MermaidFenceHostImpl({
         wheelActivation="modifier"
       >
         <MermaidIframeRuntime
+          runtimeHtml={runtimeHtml}
           request={request}
           onRendered={handleRendered}
           onRenderFailed={renderFailed}
@@ -127,6 +131,7 @@ function MermaidFenceHostImpl({
       </ZoomableViewport>
       {isFullscreen && visible ? (
         <MermaidFullscreenViewer
+          runtimeHtml={runtimeHtml}
           source={visible.source}
           colorScheme={visible.colorScheme}
           onClose={closeFullscreen}
@@ -178,5 +183,11 @@ const mapColorScheme = (theme: Theme) => ({ colorScheme: theme.colorScheme });
 const ThemedMermaidFenceHost = withUnistyles(MermaidFenceHostImpl);
 
 export function MermaidFenceHost(props: MarkdownFenceRendererProps) {
-  return <ThemedMermaidFenceHost {...props} uniProps={mapColorScheme} />;
+  return (
+    <MermaidRuntimeResource {...props}>
+      {(runtimeHtml) => (
+        <ThemedMermaidFenceHost {...props} runtimeHtml={runtimeHtml} uniProps={mapColorScheme} />
+      )}
+    </MermaidRuntimeResource>
+  );
 }

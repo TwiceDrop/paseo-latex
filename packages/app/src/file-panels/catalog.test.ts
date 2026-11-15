@@ -75,6 +75,34 @@ describe("built-in file panels", () => {
     },
   );
 
+  it("honors a document plugin association per format and falls back on hosts without it", () => {
+    const plugin = { id: "plugin:doc-viewer/pdf", builtin: false, files: { extensions: ["pdf"] } };
+    const associations = { "ext:pdf": plugin.id };
+    const file = { path: "sample.pdf", kind: "binary" } as const;
+    expect(
+      resolveFilePanel({ file, candidates: filePanelCatalog([plugin]), associations }).panel,
+    ).toBe(plugin);
+    expect(resolveFilePanel({ file, candidates: builtins, associations }).panel?.id).toBe(
+      "builtin:document",
+    );
+    expect(associations).toEqual({ "ext:pdf": plugin.id });
+    expect(
+      resolveFilePanel({
+        file: { ...file, path: "slides.pptx" },
+        candidates: filePanelCatalog([plugin]),
+        associations,
+      }).panel?.id,
+    ).toBe("builtin:document");
+    expect(
+      resolveFilePanel({
+        file,
+        candidates: filePanelCatalog([plugin]),
+        associations,
+        choice: "builtin:document",
+      }).panel?.id,
+    ).toBe("builtin:document");
+  });
+
   it.each(["png", "jpg", "jpeg", "gif", "webp", "svg"])(
     "registers the image extension %s",
     (extension) => {

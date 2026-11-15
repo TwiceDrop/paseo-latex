@@ -128,7 +128,9 @@
     "latex:keygen": "node scripts/latex/signing.mjs",
     "latex:prepare": "node scripts/latex/prepare.mjs",
     "latex:web": "node scripts/latex/build-web.mjs",
-    "latex:update": "node scripts/latex/update.mjs"
+    "latex:update": "node scripts/latex/update.mjs",
+    "latex:patches": "node scripts/latex/patches.mjs",
+    "latex:verify": "node scripts/latex/verify.mjs"
   },
   "devDependencies": {
     "@types/ws": "^8.5.14",

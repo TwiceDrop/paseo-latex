@@ -173,7 +173,6 @@ export default defineConfig({
     include: [
       "react/jsx-runtime",
       "react-native-enriched-markdown",
-      "react-native-markdown-display/src/lib/util/tokensToAST",
       "react/compiler-runtime",
       "expo-router/react-navigation",
       "@testing-library/react",

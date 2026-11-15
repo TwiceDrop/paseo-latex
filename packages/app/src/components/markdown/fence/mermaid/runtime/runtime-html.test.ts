@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mermaidRuntimeHtml } from "./html.gen";
+import mermaidRuntimeHtml from "./mermaid.gen.html?raw";
 
 describe("Mermaid runtime document", () => {
   it("ships a closed network policy", () => {

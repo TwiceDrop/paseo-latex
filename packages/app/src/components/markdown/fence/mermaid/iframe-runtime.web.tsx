@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { DiagramColorScheme, MermaidRenderRequest } from "./render-model";
-import { mermaidRuntimeHtml } from "./runtime/html.gen";
 import { parseMermaidRuntimeMessage, type MermaidRuntimeRenderMessage } from "./runtime/messages";
 import { MermaidRuntimeRequestDriver } from "./runtime/request-driver";
 
@@ -13,6 +12,7 @@ export interface MermaidRenderedMessage {
 }
 
 interface MermaidIframeRuntimeProps {
+  runtimeHtml: string;
   request: MermaidRenderRequest | null;
   onRendered: (message: MermaidRenderedMessage) => void;
   onRenderFailed: (revision: number) => void;
@@ -20,6 +20,7 @@ interface MermaidIframeRuntimeProps {
 
 /** Sandboxed Mermaid renderer. Sizing and gestures belong to the surrounding viewport. */
 export function MermaidIframeRuntime({
+  runtimeHtml,
   request,
   onRendered,
   onRenderFailed,
@@ -75,7 +76,7 @@ export function MermaidIframeRuntime({
       aria-hidden
       inert
       sandbox="allow-scripts"
-      srcDoc={mermaidRuntimeHtml}
+      srcDoc={runtimeHtml}
       tabIndex={-1}
       style={iframeStyle}
     />

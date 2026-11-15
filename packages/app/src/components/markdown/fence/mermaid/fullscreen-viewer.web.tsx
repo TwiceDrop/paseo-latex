@@ -13,6 +13,7 @@ import type { DiagramColorScheme } from "./render-model";
 import { useMermaidRenderModel } from "./use-render-model";
 
 interface MermaidFullscreenViewerProps {
+  runtimeHtml: string;
   source: string;
   colorScheme: DiagramColorScheme;
   onClose: () => void;
@@ -24,6 +25,7 @@ const FALLBACK_SIZE = { width: 240, height: 240 };
 const VIEWER_FIT = { padding: SPACING[6] };
 
 export function MermaidFullscreenViewer({
+  runtimeHtml,
   source,
   colorScheme,
   onClose,
@@ -112,6 +114,7 @@ export function MermaidFullscreenViewer({
                 wheelActivation="always"
               >
                 <MermaidIframeRuntime
+                  runtimeHtml={runtimeHtml}
                   request={request}
                   onRendered={handleRendered}
                   onRenderFailed={renderFailed}

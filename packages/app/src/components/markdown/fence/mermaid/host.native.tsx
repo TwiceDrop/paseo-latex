@@ -16,7 +16,7 @@ import { HighlightedCodeBlock } from "@/components/highlighted-code-block";
 import type { Theme } from "@/styles/theme";
 import type { MarkdownFenceRendererProps } from "./types";
 import type { MermaidRenderRequest } from "./render-model";
-import { mermaidRuntimeHtml } from "./runtime/html.gen";
+import { MermaidRuntimeResource } from "./runtime-resource";
 import {
   parseMermaidRuntimeMessage,
   serializeMermaidRuntimeRenderMessage,
@@ -27,14 +27,15 @@ import { useMermaidRenderModel } from "./use-render-model";
 import { getDiagramBoxStyle } from "./presentation";
 
 interface MermaidFenceHostImplProps extends MarkdownFenceRendererProps {
+  runtimeHtml: string;
   colorScheme?: "light" | "dark";
 }
 
-const WEBVIEW_SOURCE = { html: mermaidRuntimeHtml };
 const WEBVIEW_ORIGIN_WHITELIST = ["*"];
 const MAX_PREVIEW_HEIGHT = 480;
 
 interface MermaidWebViewProps {
+  runtimeHtml: string;
   request: MermaidRenderRequest | null;
   interactive: boolean;
   onRendered: (message: {
@@ -49,12 +50,14 @@ interface MermaidWebViewProps {
 }
 
 function MermaidWebView({
+  runtimeHtml,
   request,
   interactive,
   onRendered,
   onRenderFailed,
   style,
 }: MermaidWebViewProps) {
+  const source = useMemo(() => ({ html: runtimeHtml }), [runtimeHtml]);
   const webViewRef = useRef<WebView | null>(null);
   const driverRef = useRef<MermaidRuntimeRequestDriver | null>(null);
   driverRef.current ??= new MermaidRuntimeRequestDriver();
@@ -117,7 +120,7 @@ function MermaidWebView({
   return (
     <WebView
       ref={webViewRef}
-      source={WEBVIEW_SOURCE}
+      source={source}
       originWhitelist={WEBVIEW_ORIGIN_WHITELIST}
       style={[webViewStyles.webView, style]}
       onMessage={handleMessage}
@@ -137,6 +140,7 @@ const webViewStyles = RNStyleSheet.create({
 });
 
 interface MermaidDiagramViewerProps {
+  runtimeHtml: string;
   code: string;
   colorScheme: "light" | "dark";
   onClose: () => void;
@@ -145,6 +149,7 @@ interface MermaidDiagramViewerProps {
 }
 
 function MermaidDiagramViewer({
+  runtimeHtml,
   code,
   colorScheme,
   onClose,
@@ -182,6 +187,7 @@ function MermaidDiagramViewer({
       <View style={viewerStyles.backdrop}>
         <View style={viewerStyles.webView}>
           <MermaidWebView
+            runtimeHtml={runtimeHtml}
             request={request}
             interactive
             onRendered={handleRendered}
@@ -271,6 +277,7 @@ const viewerStyles = StyleSheet.create((theme, runtime) => ({
 }));
 
 function MermaidFenceHostImpl({
+  runtimeHtml,
   code,
   phase,
   inheritedStyles,
@@ -339,6 +346,7 @@ function MermaidFenceHostImpl({
       >
         <View style={previewInnerStyle} pointerEvents="none">
           <MermaidWebView
+            runtimeHtml={runtimeHtml}
             request={request}
             interactive={false}
             onRendered={handleRendered}
@@ -348,6 +356,7 @@ function MermaidFenceHostImpl({
       </Pressable>
       {viewerOpen && canShowDiagram && visible ? (
         <MermaidDiagramViewer
+          runtimeHtml={runtimeHtml}
           code={visible.source}
           colorScheme={visible.colorScheme}
           onClose={closeViewer}
@@ -375,5 +384,11 @@ const mapColorScheme = (theme: Theme) => ({ colorScheme: theme.colorScheme });
 const ThemedMermaidFenceHost = withUnistyles(MermaidFenceHostImpl);
 
 export function MermaidFenceHost(props: MarkdownFenceRendererProps) {
-  return <ThemedMermaidFenceHost {...props} uniProps={mapColorScheme} />;
+  return (
+    <MermaidRuntimeResource {...props}>
+      {(runtimeHtml) => (
+        <ThemedMermaidFenceHost {...props} runtimeHtml={runtimeHtml} uniProps={mapColorScheme} />
+      )}
+    </MermaidRuntimeResource>
+  );
 }
