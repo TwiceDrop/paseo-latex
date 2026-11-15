@@ -61,7 +61,7 @@
 - [x] 调整现有测试，保留首次创建的 CNB provider，不再通过重设 feed 掩盖错误。已发布 `0.15.4-r1` EXE 内的旧代码在真实 Electron 中复现同一异常；修复后通过首次检查、完整下载与损坏文件拒绝，未执行安装。
 - [x] 2026-11-13 发布 `0.15.4-r2`（[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.4-r2) / [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.4-r2)）与回移修复的 `0.15.3-r3`（[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.3-r3) / [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.3-r3)）。两版均提供 Windows x64、Android ARM64、更新清单和校验文件；最新更新目标保持 `0.15.4-r2`，旧维护版不提升为 latest。
 - 验证：[0.15.4-r2 构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43394256955) 通过 566 项检查，[0.15.3-r3 构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43394261116) 通过 344 项检查；两份实际 EXE 内的更新器代码与修复构建一致，并在真实 Electron 中通过首次请求、完整下载及损坏拒绝检查。Android 两版沿用原证书，版本码分别为 `1500402`、`1500303`。[新版镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/43400949547) 与 [维护版镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/43401935132) 校验全部公开附件；客户端和 Windows 清单确认从 `0.15.3-r3` 升级到 `0.15.4-r2`，且发布维护版后 latest 未回退。
-- [ ] 用户在 Windows 手动覆盖安装 `0.15.3-r3` 后，实测通过 CNB 更新到最新版（当前 `0.15.4-r3`）。已安装的错误更新器不能靠服务端替换清单修复；Android 不受该初始化问题影响。
+- [ ] 用户在 Windows 手动覆盖安装 `0.15.3-r3` 后，实测通过 CNB 更新到最新版（当前 `0.15.4-r4`）。已安装的错误更新器不能靠服务端替换清单修复；Android 不受该初始化问题影响。
 
 ## LATEX-006：兼容官方 Host 的跨设备聊天附件
 
@@ -77,4 +77,17 @@
 - 测试稳定性：首轮云端文件预览断言曾超时一次，重试通过；随后本地三个独立浏览器重复运行及最终云端运行全部通过，保留此记录供后续复核。
 - [x] 2026-11-13 完成双平台构建并发布 `0.15.4-r3`：[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.4-r3) 与 [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.4-r3) 均提供 Windows x64、Android ARM64、更新清单和校验文件。两个安装包来自源码 `14c8b59df64ad7c321953fc338d39daf26ffe133`，沿用原应用身份及 Android 签名；[发布工作流](https://github.com/TwiceDrop/paseo-latex/actions/runs/43438105169) 已复核源码、签名和版本码。
 - 发布验证：[CNB 镜像任务](https://github.com/TwiceDrop/paseo-latex/actions/runs/43438222924) 校验四个附件上传后及公开下载的完整 SHA-256，与 GitHub 一致。实际客户端解析器确认 latest 为 `0.15.4-r3`、Android `versionCode=1500403`；Windows 清单为 `0.15.4-latex.3`，下载地址固定到本次标签。Windows 包内更新器通过真实 Electron 的首次请求、完整下载及损坏拒绝检查。未进行 Windows、Android 真机操作验证。
+
 - 存储位置、兼容边界及保留策略见 [共享聊天附件](latex-client.md#shared-chat-attachments-with-official-hosts)。
+
+## LATEX-007：插件择优、渲染资源优化与可重放补丁
+
+- [x] 2026-11-15 完成[逐项比较与取舍](latex-plugin-decisions.md)：公式保留原生 RaTeX/Web KaTeX；Office 保留页面/幻灯片版式；高级 PDF 使用官方文件面板插件入口；保留官方 Host 附件兼容、现有连接下载、侧边栏修补和 CNB 分发。
+- [x] Mermaid 运行时移为安装包内按需 HTML，首个图表才读取，全屏复用，最后一个使用者退出后清理查询缓存；加载失败保留源码并支持重试。删除 19 个未使用的旧数学渲染文件及旧依赖。
+- [x] 相同参数的生产导出：Web 主入口 `24,061,325 → 20,484,677` 字节（减少 14.86%），Android Hermes `31,600,445 → 24,672,245` 字节（减少 21.92%）；单独 HTML 资源仍打包，不能等同安装包缩小比例或真机性能提升。
+- [x] `latex:patches export/check` 提供基准/源码 SHA、完整二进制补丁、功能索引与校验；实际 212 个路径重放到官方 `v0.15.4` 后得到完全相同的源码树。`latex:update --dry-run` 在临时索引预检，拒绝旧基准回退；迁移与 CI 共用 `latex:verify` 定向回归。
+- [x] 本地 438 项单元、68 项浏览器、6 项隔离 Host 场景、38 项工具检查通过；全工作区类型及 lint 检查通过。首次云端附件用例暴露自动滚动点击与末尾定位的竞争：录像显示目标离开点击位置，且未发出文件读取。改为先模拟用户滚轮、确认进入视口再点击，保留原下载断言；本地三次独立会话和第二轮云端附件检查通过。
+- 云端源码检查：438 项客户端单元、68 项浏览器、14 项导航/文档/Mermaid 场景、3 项附件兼容场景通过，另通过 222 项 Host 模型与功能门控、38 项桌面更新器检查；补丁重建、类型、lint、网页导出及格式检查通过。
+- [x] 2026-11-15 发布 `0.15.4-r4`：[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.4-r4) / [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.4-r4)。Windows x64、Android ARM64 来自同一源码 `7b785ede0ab2a461c395d4a6a9ad4c70e252a338`；[最终构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43685723542) 和[发布任务](https://github.com/TwiceDrop/paseo-latex/actions/runs/43689784757) 均成功，保留原应用身份和 Android 证书。
+- 发布验证：[CNB 镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/43689837484) 校验四个附件上传后与公开下载的完整 SHA-256；实际客户端解析器确认 latest 为 `0.15.4-r4`、Android `versionCode=1500404`，Windows 清单为 `0.15.4-latex.4`，下载地址固定到本次标签。Windows 包内更新器通过首次请求、完整下载及损坏拒绝检查。没有实体 Android/Windows 交互性能或覆盖安装数据。
+- [补丁归档](https://github.com/TwiceDrop/paseo-latex/actions/runs/43685723542/artifacts/14150339217) 保留 30 天；可随时从 Git 源码重新导出。归档内补丁 SHA-256 为 `3df641de91cd1a4a9da3e7e36e855f9cc25a4f906f8f579ce45d47ed26ca6907`，重放后的 Git tree 为 `a07871c395d23c1ff5db8170f11b89a2f3d049da`。

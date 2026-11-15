@@ -108,7 +108,8 @@ personal installer. Copying a release cannot add an updater to an old binary.
 Windows `0.15.3-r2` and `0.15.4-r1` have an updater initialization defect that reports
 `Cannot read properties of null (reading 'request')`. Manually install a fixed
 Windows build once: `0.15.3-r3` retains the older base for upgrade testing, while
-`0.15.4-r3` is the current fixed version and also adds shared chat attachments.
+`0.15.4-r4` is the current fixed version. It retains shared chat attachments and
+adds the [renderer optimizations and reusable patch workflow](latex-plugin-decisions.md).
 The Android updater is not affected.
 
 ## Personal client updates
