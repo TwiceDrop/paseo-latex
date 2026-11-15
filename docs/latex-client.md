@@ -42,7 +42,7 @@ are restricted to `getpaseo/paseo`; they do not deploy official services or publ
 releases from this personal repository.
 
 For the independent Windows installer, use a Windows machine and
-`npm run windows:latex -- --revision 4`, or manually run **LaTeX Source Build**
+`npm run windows:latex -- --revision 5`, or manually run **LaTeX Source Build**
 with its Windows option enabled. Linux cloud environments cannot directly run
 the Windows-only installer script. Increase the revision after each delivery.
 
@@ -108,8 +108,9 @@ personal installer. Copying a release cannot add an updater to an old binary.
 Windows `0.15.3-r2` and `0.15.4-r1` have an updater initialization defect that reports
 `Cannot read properties of null (reading 'request')`. Manually install a fixed
 Windows build once: `0.15.3-r3` retains the older base for upgrade testing, while
-`0.15.4-r4` is the current fixed version. It retains shared chat attachments and
-adds the [renderer optimizations and reusable patch workflow](latex-plugin-decisions.md).
+`0.15.4-r5` is the current fixed version. It includes shared chat attachments and
+the [renderer optimizations and reusable patch workflow](latex-plugin-decisions.md),
+plus attachment reconnection recovery and native streaming scroll fixes.
 The Android updater is not affected.
 
 ## Personal client updates

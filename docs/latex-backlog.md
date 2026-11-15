@@ -111,3 +111,7 @@
 - [x] 新增真实底部控制器与原生手势状态机的时序回归：松手后的 JS 帧先执行、惯性事件延后、随后流式内容增高，旧算法出现一次错误的回底部调用；修复后没有该调用。这是受控事件序列，不是 Android 真机 trace。
 - [x] 修复：Android 拖动至惯性结束持续保留用户滚动控制权（包括零速度松手）；上翻离开底部立即解除自动跟随。阅读时保留原生可见行位置补偿、移除自动回顶阈值；主动回底部会释放手势状态，继续生成时仍可跟随。
 - [ ] 真机复核：持续生成时慢拖/快速上划到最早消息、历史分页、回底部、生成结束与切后台恢复。当前环境无 Android 设备，不能把单元/浏览器结果当成实机验证。
+- [x] 2026-11-15 将 LATEX-008/009 修复发布为 `0.15.4-r5`：[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.4-r5) / [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.4-r5)。Windows x64 与 Android ARM64 同源于 `e1c4fd4f1a201b7426c9970568ba2c07b2cdbe53`；[构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43729207492)、[发布](https://github.com/TwiceDrop/paseo-latex/actions/runs/43733135373)及[CNB 镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/43733204514)均成功。
+- 云端验证：492 项客户端单元、68 项浏览器、14 项导航/文档/Mermaid 场景、3 项跨设备/官方 Host 附件场景通过；另通过 222 项 Host、38 项桌面更新器和 38 项工作流检查，类型、lint、格式、正式网页导出及补丁重建通过。
+- 发布验证：保留原 Android 签名和应用身份；镜像下载并校验四个文件的完整 SHA-256。实际客户端解析器确认 CNB latest 为 `0.15.4-r5`、Android `versionCode=1500405`，Windows 清单为 `0.15.4-latex.5`，下载地址绑定本次标签。Windows 包内更新器通过首次请求、完整下载及损坏拒绝检查；没有 Android 真机手势或覆盖安装验证。
+- [补丁归档](https://github.com/TwiceDrop/paseo-latex/actions/runs/43729207492/artifacts/14168291335)的补丁 SHA-256 为 `a02513117d6f1d4c05451a509e8988a87e4da395f172d7faa1a745bacdf0abe5`，重建 tree 为 `4a8a481f0daba6b24b51ab7e3fbfbe01de391120`，无未归类文件。
