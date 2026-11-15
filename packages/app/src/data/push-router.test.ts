@@ -705,6 +705,50 @@ describe("server data push router", () => {
     unmount();
   });
 
+  it("recovers active attachment reads after reconnect without fetching inactive or other-host rows", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const keys = [
+      ["sharedMessageAttachments", "server-1", "agent", "message"],
+      ["sharedMessageImage", "server-1", "image"],
+      ["sharedMessageAttachments", "server-1", "inactive"],
+      ["sharedMessageImage", "server-2", "image"],
+    ];
+    let connected = false;
+    const reads = [0, 0, 0, 0];
+    const observers = keys.map(
+      (queryKey, index) =>
+        new QueryObserver(queryClient, {
+          queryKey,
+          enabled: false,
+          queryFn: async () => {
+            reads[index] += 1;
+            if (!connected) throw new Error("Connection closed");
+            return "recovered";
+          },
+        }),
+    );
+    const onResult = () => {};
+    const subscriptions = observers.map((observer) => observer.subscribe(onResult));
+    try {
+      await Promise.all(observers.map((observer) => observer.refetch()));
+      expect(reads).toEqual([1, 1, 1, 1]);
+      expect(observers[0]!.getCurrentResult().isError).toBe(true);
+      const otherHostState = queryClient.getQueryState(keys[3]!);
+      connected = true;
+      observers[0]!.setOptions({ ...observers[0]!.options, enabled: true, retryOnMount: false });
+      observers[1]!.setOptions({ ...observers[1]!.options, enabled: true, retryOnMount: false });
+      invalidateServerDataQueriesAfterReconnect({ queryClient, serverId: "server-1" });
+      await expect.poll(() => observers[0]!.getCurrentResult().data).toBe("recovered");
+      await expect.poll(() => observers[1]!.getCurrentResult().data).toBe("recovered");
+      expect(reads).toEqual([2, 2, 1, 1]);
+      expect(queryClient.getQueryState(keys[2]!)?.isInvalidated).toBe(true);
+      expect(queryClient.getQueryState(keys[3]!)).toBe(otherHostState);
+    } finally {
+      subscriptions.forEach((unsubscribe) => unsubscribe());
+      queryClient.clear();
+    }
+  });
+
   it("invalidates only the reconnect-repair scopes for one server", () => {
     const queryClient = new QueryClient();
     const serverId = "server-1";

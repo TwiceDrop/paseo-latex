@@ -91,3 +91,23 @@
 - [x] 2026-11-15 发布 `0.15.4-r4`：[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.4-r4) / [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.4-r4)。Windows x64、Android ARM64 来自同一源码 `7b785ede0ab2a461c395d4a6a9ad4c70e252a338`；[最终构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43685723542) 和[发布任务](https://github.com/TwiceDrop/paseo-latex/actions/runs/43689784757) 均成功，保留原应用身份和 Android 证书。
 - 发布验证：[CNB 镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/43689837484) 校验四个附件上传后与公开下载的完整 SHA-256；实际客户端解析器确认 latest 为 `0.15.4-r4`、Android `versionCode=1500404`，Windows 清单为 `0.15.4-latex.4`，下载地址固定到本次标签。Windows 包内更新器通过首次请求、完整下载及损坏拒绝检查。没有实体 Android/Windows 交互性能或覆盖安装数据。
 - [补丁归档](https://github.com/TwiceDrop/paseo-latex/actions/runs/43685723542/artifacts/14150339217) 保留 30 天；可随时从 Git 源码重新导出。归档内补丁 SHA-256 为 `3df641de91cd1a4a9da3e7e36e855f9cc25a4f906f8f579ce45d47ed26ca6907`，重放后的 Git tree 为 `a07871c395d23c1ff5db8170f11b89a2f3d049da`。
+
+## LATEX-008：弱网时共享附件误报 Host 版本不支持
+
+- 2026-11-15 用户先要求排查，随后明确要求修复并发布。手机使用最新版个人客户端，Windows 官方 Host `0.15.0`；动车弱网时出现“无法加载共享附件：请更新官方 Host，以启用附件共享。”，网络良好时不出现。重试按钮显示 `common.retry`。
+- [x] 核对官方 `v0.15.0` 与 `v0.15.4`：均声明 `workspaceFileEditing=true`、`canonicalSubmittedPrompts=true`，不能仅凭该提示要求升级 Host。
+- [x] 定位客户端误判：`shared-message-runtime.ts` 的 `getSharedMessageStore()` 把 `getLastServerInfoMessage() === null` 和确实缺少功能一起当作 Host 不支持；实际 `DaemonClient` 会在断线/重连时清空握手信息。
+- [x] 定向时序模拟使用原有运行时函数、查询配置和 TanStack Query：渲染时能力有效，查询启动前模拟握手信息清空，即复现相同中文错误，文件读取次数为 0；查询禁用后错误仍保留，恢复握手并重新启用后成功。该证据是控制时序模拟，不是动车网络或 Android 真机复现。
+- [x] 定位文案错误：附件组件两处调用不存在的 `common.retry`，正确键是 `common.actions.retry`。中英文资源均使用后者。
+- [x] 修复：握手丢失返回连接错误，只有已握手且确实缺少能力时提示更新 Host；断线时显示重连状态并禁用重试。重连按 Host 使附件元数据和图片查询失效，查询启动时获取当前连接，瞬时连接错误最多重试两次；真实权限/元数据错误仍可见。修正重试按钮翻译，保留前台/活动面板门控与读取并发上限。
+- [x] 定向回归覆盖握手丢失/恢复、真正能力缺失、错误分类与重试上限、按 Host 恢复且不读取非活动行；没有证据表明原提示代表 ZIP 损坏或附件数据丢失。
+- [x] 浏览器端到端：第二设备无附件本地缓存，读取途中切断 WebSocket，显示重连和禁用的“重试”；重新握手后自动恢复图片/文件，重新加载会话及打开预览通过。没有点击重试或重启 Host。
+
+## LATEX-009：Android 流式生成时上翻历史回弹
+
+- 2026-11-15 用户反馈：回复仍在生成时，历史无法拉到最上方，会回弹到固定位置；**生成自然结束后，不退出会话即可正常上翻**。截图中“回到底部”按钮可见。
+- [x] 代码排查：原生聊天使用倒置 `FlatList`，实时内容放在 `ListHeaderComponent`；Android 只在 `sticky-bottom` 时禁用 `maintainVisibleContentPosition`，脱离底部阅读历史时仍启用。React Native 的该辅助器会在布局变化后主动调用 `scrollToPreservingMomentum`，与 JS 底部控制器是两条滚动调整路径。
+- [x] 核对这些滚动核心文件与官方 `v0.15.4` 一致。本次定向运行 `bottom-anchor-controller.test.ts`、`history-start-pagination.test.ts` 共 33 项通过，覆盖逻辑层的手动脱离、内容增长和分页；不能据此认定原生布局、手势和惯性时序无误。
+- [x] 新增真实底部控制器与原生手势状态机的时序回归：松手后的 JS 帧先执行、惯性事件延后、随后流式内容增高，旧算法出现一次错误的回底部调用；修复后没有该调用。这是受控事件序列，不是 Android 真机 trace。
+- [x] 修复：Android 拖动至惯性结束持续保留用户滚动控制权（包括零速度松手）；上翻离开底部立即解除自动跟随。阅读时保留原生可见行位置补偿、移除自动回顶阈值；主动回底部会释放手势状态，继续生成时仍可跟随。
+- [ ] 真机复核：持续生成时慢拖/快速上划到最早消息、历史分页、回底部、生成结束与切后台恢复。当前环境无 Android 设备，不能把单元/浏览器结果当成实机验证。

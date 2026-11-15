@@ -3,11 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { DaemonConnectionError, type DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { AgentAttachment, UploadedFileAttachment } from "@getpaseo/protocol/messages";
 import type { AttachmentMetadata } from "@/attachments/types";
 import {
   getSharedMessageStore,
+  isSharedAttachmentConnectionError,
+  retrySharedAttachmentRead,
   shareMessageAttachments,
 } from "@/attachments/shared-message-runtime";
 import { getAgentAttachmentPillContent } from "@/attachments/attachment-pill-content";
@@ -23,7 +25,8 @@ import { createAssistantImageAcquisitionCache } from "@/assistant-image/acquisit
 import { useFetchQuery } from "@/data/query";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useAppVisible } from "@/hooks/use-app-visible";
-import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
+import { getHostRuntimeStore, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
+import { i18n } from "@/i18n/i18next";
 import { useFileLink } from "@/assistant-file-links";
 import {
   AttachmentFrame,
@@ -41,6 +44,12 @@ const imageCache = createAssistantImageAcquisitionCache<AttachmentMetadata>({
   onRetain: (metadata) => retainAttachmentForGarbageCollection(metadata.id),
 });
 
+function currentAttachmentClient(serverId: string | undefined): DaemonClient {
+  const client = serverId ? getHostRuntimeStore().getClient(serverId) : null;
+  if (!client) throw new DaemonConnectionError(i18n.t("common.errors.daemonClientDisconnected"));
+  return client;
+}
+
 export interface UserMessageAttachmentProps {
   client?: DaemonClient | null;
   serverId?: string;
@@ -56,7 +65,7 @@ export function UserMessageAttachments(props: UserMessageAttachmentProps) {
   const { t } = useTranslation();
   const images = props.images ?? EMPTY_IMAGES;
   const attachments = props.attachments ?? EMPTY_ATTACHMENTS;
-  const { query, enabled } = useSharedAttachments(props, images, attachments);
+  const { query, enabled, connected } = useSharedAttachments(props, images, attachments);
   const [lightbox, setLightbox] = useState<AttachmentMetadata | null>(null);
   const close = useCallback(() => setLightbox(null), []);
   const lightboxSource = useMemo(
@@ -80,9 +89,9 @@ export function UserMessageAttachments(props: UserMessageAttachmentProps) {
                 <SharedImage
                   key={image.id}
                   image={image}
-                  client={props.client!}
                   serverId={props.serverId!}
                   enabled={enabled}
+                  connected={connected}
                   onOpen={setLightbox}
                   localImage={images[index]}
                 />
@@ -102,10 +111,16 @@ export function UserMessageAttachments(props: UserMessageAttachmentProps) {
       {query.isError ? (
         <View style={styles.error} testID="shared-attachments-error">
           <Text style={styles.errorText}>
-            {t("message.attachments.sharedLoadFailed", { error: query.error.message })}
+            {!connected
+              ? t("agentPanel.states.reconnecting")
+              : t("message.attachments.sharedLoadFailed", {
+                  error: isSharedAttachmentConnectionError(query.error)
+                    ? t("common.errors.daemonClientDisconnected")
+                    : query.error.message,
+                })}
           </Text>
           <Button size="sm" variant="ghost" disabled={query.isFetching || !enabled} onPress={retry}>
-            {query.isFetching ? t("message.attachments.sharedLoading") : t("common.retry")}
+            {query.isFetching ? t("message.attachments.sharedLoading") : t("common.actions.retry")}
           </Button>
         </View>
       ) : null}
@@ -144,10 +159,17 @@ function useSharedAttachments(
     enabled,
     dataShape: "value",
     staleTimeMs: 30_000,
-    retry: false,
+    retry: (count, error) =>
+      Boolean(
+        getHostRuntimeStore()
+          .getClient(props.serverId ?? "")
+          ?.getLastServerInfoMessage(),
+      ) && retrySharedAttachmentRead(count, error),
+    retryDelay: 1000,
     gcTime: 5 * 60_000,
     queryFn: async () => {
-      const client = props.client!;
+      // Reconnection can replace the client before React commits the new props.
+      const client = currentAttachmentClient(props.serverId);
       const store = getSharedMessageStore(client);
       let shared = await store.read(props);
       if (!shared && props.clientMessageId && (images.length || attachments.length)) {
@@ -163,7 +185,7 @@ function useSharedAttachments(
       return shared;
     },
   });
-  return { query, enabled };
+  return { query, enabled, connected };
 }
 
 function LocalImage({
@@ -184,16 +206,16 @@ function LocalImage({
 
 function SharedImage({
   image,
-  client,
   serverId,
   enabled,
+  connected,
   onOpen,
   localImage,
 }: {
   image: UploadedFileAttachment;
-  client: DaemonClient;
   serverId: string;
   enabled: boolean;
+  connected: boolean;
   onOpen: (image: AttachmentMetadata) => void;
   localImage?: AttachmentMetadata;
 }) {
@@ -211,21 +233,29 @@ function SharedImage({
     }
     const target = resolveFilePreviewReadTarget({ path: image.path });
     if (!target) throw new Error(t("message.attachments.imageUnavailable"));
-    const file = await client.readFile(target.cwd, target.path, undefined, 50 * 1024 * 1024);
+    const file = await currentAttachmentClient(serverId).readFile(
+      target.cwd,
+      target.path,
+      undefined,
+      50 * 1024 * 1024,
+    );
     if (file.bytes.length !== image.size) throw new Error(t("message.attachments.imageLoadFailed"));
     return persistAttachmentFromBytes({
       bytes: file.bytes,
       mimeType: image.mimeType,
       fileName: image.fileName,
     });
-  }, [client, image, localImage, t]);
+  }, [serverId, image, localImage, t]);
   const query = useFetchQuery({
-    queryKey: ["sharedMessageImage", key],
+    queryKey: ["sharedMessageImage", serverId, key],
     enabled,
     dataShape: "value",
     immutableWhen: () => true,
     gcTime: 0,
-    retry: false,
+    retry: (count, error) =>
+      Boolean(getHostRuntimeStore().getClient(serverId)?.getLastServerInfoMessage()) &&
+      retrySharedAttachmentRead(count, error),
+    retryDelay: 1000,
     queryFn: ({ signal }) => imageCache.acquire(key, () => imageReads.run(locate, signal)),
   });
   const refetch = query.refetch;
@@ -241,9 +271,13 @@ function SharedImage({
     <View style={styles.imageStatus} testID="shared-image-status">
       {query.isError ? (
         <>
-          <Text style={styles.errorText}>{t("message.attachments.imageLoadFailed")}</Text>
+          <Text style={styles.errorText}>
+            {t(
+              connected ? "message.attachments.imageLoadFailed" : "agentPanel.states.reconnecting",
+            )}
+          </Text>
           <Button size="sm" variant="ghost" disabled={!enabled || query.isFetching} onPress={retry}>
-            {t("common.retry")}
+            {t("common.actions.retry")}
           </Button>
         </>
       ) : (

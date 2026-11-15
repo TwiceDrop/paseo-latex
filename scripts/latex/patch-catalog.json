@@ -47,6 +47,8 @@
         "packages/app/src/components/message.tsx",
         "packages/app/src/components/user-message/",
         "packages/app/src/agent-stream/view",
+        "packages/app/src/data/push-router",
+        "packages/app/e2e/support/helpers/daemon-websocket-gate",
         "packages/app/e2e/browser/composer-attachments"
       ],
       "contract": "Official Host file APIs, durable metadata before send, cross-device retrieval, bounded caches."
@@ -57,6 +59,9 @@
         "packages/app/src/components/sidebar",
         "packages/app/src/components/floating-header/",
         "packages/app/src/mobile-panels/",
+        "packages/app/src/agent-stream/strategy-native",
+        "packages/app/src/agent-stream/native-scroll-gesture",
+        "packages/app/src/agent-stream/bottom-anchor-controller",
         "packages/app/src/panels/",
         "packages/app/e2e/browser/sidebar-reorder",
         "packages/app/e2e/browser/workspace-navigation"

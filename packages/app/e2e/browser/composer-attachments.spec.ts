@@ -2,6 +2,7 @@ import { expect, test } from "../support/fixtures";
 import { clickNewChat } from "../support/helpers/launcher";
 import { expectComposerVisible } from "../support/helpers/composer";
 import { expectAgentIdle } from "../support/helpers/agent-stream";
+import { installDaemonWebSocketGate } from "../support/helpers/daemon-websocket-gate";
 import {
   readScrollMetrics,
   scrollChatAwayFromBottom,
@@ -375,6 +376,9 @@ for (const mode of ["existing chat", "initial prompt"] as const) {
         },
       });
       const receiver = await second.newPage();
+      const reconnectGate =
+        mode === "existing chat" ? await installDaemonWebSocketGate(receiver) : null;
+      reconnectGate?.holdNextClientRequest("file_explorer_request");
       const diagnostics: string[] = [];
       receiver.on("console", (m) => {
         if (m.type() === "error") diagnostics.push(m.text());
@@ -397,6 +401,23 @@ for (const mode of ["existing chat", "initial prompt"] as const) {
       });
       await receiver.goto(url);
       await receiver.bringToFront();
+      if (reconnectGate) {
+        await reconnectGate.waitForHeldClientRequest();
+        await reconnectGate.drop();
+        reconnectGate.discardHeldClientRequest();
+        const error = receiver.getByTestId("shared-attachments-error");
+        await expect(error.first()).toBeVisible();
+        await expect(error.first()).toContainText("Reconnecting");
+        await expect(
+          error.first().getByRole("button", { name: "Retry", exact: true }),
+        ).toBeDisabled();
+        await expect(receiver.getByText("Update the official host", { exact: false })).toHaveCount(
+          0,
+        );
+        await expect(receiver.getByText("common.retry", { exact: true })).toHaveCount(0);
+        await reconnectGate.waitForBlockedConnection();
+        reconnectGate.restoreFresh();
+      }
       await expectComposerVisible(receiver);
       await expect(
         receiver
@@ -409,6 +430,7 @@ for (const mode of ["existing chat", "initial prompt"] as const) {
       await expect(
         receiver.getByRole("button", { name: "Open file: config.json", exact: true }),
       ).toBeVisible();
+      await expect(receiver.getByTestId("shared-attachments-error")).toHaveCount(0);
       await receiver.getByRole("button", { name: "Open image attachment", exact: true }).click();
       await expect(receiver.getByTestId("attachment-lightbox")).toBeVisible();
       await expect

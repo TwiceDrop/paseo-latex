@@ -97,6 +97,13 @@ interface ReconnectRepairPolicy {
 
 const RECONNECT_REPAIR_POLICIES: ReconnectRepairPolicy[] = [
   {
+    domain: "sharedAttachments",
+    invalidate: ({ queryClient, serverId }) => {
+      void queryClient.invalidateQueries({ queryKey: ["sharedMessageAttachments", serverId] });
+      void queryClient.invalidateQueries({ queryKey: ["sharedMessageImage", serverId] });
+    },
+  },
+  {
     domain: "providersSnapshot",
     invalidate: ({ queryClient, serverId }) => {
       void queryClient.invalidateQueries({ queryKey: providersSnapshotQueryRoot(serverId) });

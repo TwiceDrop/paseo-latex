@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { DaemonConnectionError } from "@getpaseo/client/internal/daemon-client";
+import { getSharedMessageStore, retrySharedAttachmentRead } from "./shared-message-runtime";
 import type { AttachmentMetadata, AttachmentStore, SaveAttachmentInput } from "@/attachments/types";
 import { __setAttachmentStoreForTests } from "./store";
 import {
@@ -54,6 +56,17 @@ function createRecordingStore(): AttachmentStore & {
 }
 
 describe("attachment service", () => {
+  it("only retries transient connection errors, with a bounded retry count", () => {
+    const disconnected = new DaemonConnectionError("Connection closed");
+    expect(retrySharedAttachmentRead(0, disconnected)).toBe(true);
+    expect(retrySharedAttachmentRead(1, new Error("Save failed", { cause: disconnected }))).toBe(
+      true,
+    );
+    expect(retrySharedAttachmentRead(2, disconnected)).toBe(false);
+    expect(retrySharedAttachmentRead(0, new Error("Permission denied"))).toBe(false);
+    expect(retrySharedAttachmentRead(0, new Error("Malformed metadata"))).toBe(false);
+  });
+
   afterEach(() => {
     __setAttachmentStoreForTests(null);
   });
@@ -196,6 +209,35 @@ describe("shared message attachments on an official host", () => {
 });
 
 describe("shared attachment persistence failures", () => {
+  it("treats a lost handshake as a connection failure and recovers on the same official host", async () => {
+    const { mkdtemp, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { createSharedMessageTestClient } = await import("./test-shared-message-client");
+    const home = await mkdtemp(`${tmpdir()}/paseo-shared-reconnect-`);
+    const supported = {
+      serverId: "official-0.15.0",
+      features: { workspaceFileEditing: true, canonicalSubmittedPrompts: true },
+    };
+    let info: typeof supported | null = supported;
+    const client = {
+      ...createSharedMessageTestClient(home),
+      getLastServerInfoMessage: () => info,
+    };
+    try {
+      const store = getSharedMessageStore(client);
+      await expect(store.read({ clientMessageId: "not-shared-yet" })).resolves.toBeNull();
+      info = null;
+      expect(() => getSharedMessageStore(client)).toThrow(DaemonConnectionError);
+      info = supported;
+      expect(getSharedMessageStore(client)).toBe(store);
+      await expect(store.read({ clientMessageId: "not-shared-yet" })).resolves.toBeNull();
+      info = { ...supported, features: { ...supported.features, workspaceFileEditing: false } };
+      expect(() => getSharedMessageStore(client)).toThrow("Update the official host");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
   it("reads and cancels queued work with React Native's AbortSignal", async () => {
     const { AbortController } = await import("abort-controller");
     const { createSharedReadQueue } = await import("./shared-message-store");

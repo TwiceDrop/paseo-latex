@@ -650,6 +650,11 @@ export async function installDaemonWebSocketGate(page: Page, options: { port?: n
       heldClientRequest = null;
       heldClientRequestType = null;
     },
+    discardHeldClientRequest(): void {
+      heldClientRequest = null;
+      heldClientRequestType = null;
+      resolveHeldClientRequest = null;
+    },
     holdNextServerMessage(type: string): void {
       pendingServerMessageHolds.set(serverMessageKey(type), {
         matches: (message) => message?.type === type,

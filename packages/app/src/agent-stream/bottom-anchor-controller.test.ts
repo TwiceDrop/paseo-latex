@@ -5,6 +5,7 @@ import {
   type BottomAnchorMode,
 } from "./bottom-anchor-controller";
 import type { BottomAnchorTransportBehavior } from "./strategy";
+import { createNativeScrollGesture } from "./native-scroll-gesture";
 
 type MeasurementState = ReturnType<typeof createMeasurementState>;
 
@@ -387,6 +388,90 @@ describe("bottom anchor controller driver", () => {
     harness.driver.endUserScroll({ isNearBottom: false });
 
     expect(harness.driver.getSnapshot().mode).toBe("detached");
+  });
+
+  it("keeps Android scroll ownership between drag-end and delayed momentum events during streaming", () => {
+    const harness = createDriverHarness();
+    const gesture = createNativeScrollGesture({
+      platform: "android",
+      begin: () => harness.driver.beginUserScroll(),
+      end: (isNearBottom) => harness.driver.endUserScroll({ isNearBottom }),
+      requestFrame: (callback) => harness.scheduler.schedule({ kind: "attempt", callback }),
+      cancelFrame: (handle) => harness.scheduler.cancel(handle),
+    });
+    gesture.beginDrag();
+    gesture.endDrag(true, 2);
+    harness.scheduler.flushAll();
+    harness.context.nearBottom = false;
+    harness.driver.handleContentSizeChange({ previousContentHeight: 1200, contentHeight: 1500 });
+    harness.scheduler.flushAll();
+    expect(harness.scrollAttempts).toEqual([]);
+    expect(gesture.isActive()).toBe(true);
+    gesture.beginMomentum();
+    harness.driver.prepareForStickyContentChange();
+    harness.scheduler.flushAll();
+    expect(harness.scrollAttempts).toEqual([]);
+    gesture.endMomentum(false);
+    harness.driver.handleContentSizeChange({ previousContentHeight: 1500, contentHeight: 1800 });
+    harness.scheduler.flushAll();
+    expect(harness.driver.getSnapshot().mode).toBe("detached");
+    expect(harness.scrollAttempts).toEqual([]);
+    gesture.reset();
+  });
+
+  it.each([0, 2])(
+    "settles Android velocity %s at momentum end and resumes bottom following",
+    (velocity) => {
+      const harness = createDriverHarness();
+      const gesture = createNativeScrollGesture({
+        platform: "android",
+        begin: () => harness.driver.beginUserScroll(),
+        end: (isNearBottom) => harness.driver.endUserScroll({ isNearBottom }),
+        requestFrame: (callback) => harness.scheduler.schedule({ kind: "attempt", callback }),
+        cancelFrame: (handle) => harness.scheduler.cancel(handle),
+      });
+      gesture.beginDrag();
+      harness.context.nearBottom = false;
+      harness.driver.detachByUser();
+      gesture.endDrag(false, velocity);
+      harness.scheduler.flushAll();
+      expect(gesture.isActive()).toBe(true);
+      gesture.beginMomentum();
+      harness.context.nearBottom = true;
+      gesture.endMomentum(true);
+      expect(gesture.isActive()).toBe(false);
+      expect(harness.driver.getSnapshot().mode).toBe("sticky-bottom");
+      harness.driver.handleContentSizeChange({ previousContentHeight: 1200, contentHeight: 1500 });
+      harness.scheduler.flushAll();
+      expect(harness.scrollAttempts.length).toBeGreaterThan(0);
+      gesture.reset();
+      gesture.beginMomentum();
+      gesture.endMomentum(false);
+      expect(gesture.isActive()).toBe(false);
+      expect(harness.driver.getSnapshot().mode).toBe("sticky-bottom");
+    },
+  );
+
+  it("settles an iOS release without momentum and cancels deferred work on reset", () => {
+    const harness = createDriverHarness();
+    const gesture = createNativeScrollGesture({
+      platform: "ios",
+      begin: () => harness.driver.beginUserScroll(),
+      end: (isNearBottom) => harness.driver.endUserScroll({ isNearBottom }),
+      requestFrame: (callback) => harness.scheduler.schedule({ kind: "attempt", callback }),
+      cancelFrame: (handle) => harness.scheduler.cancel(handle),
+    });
+    gesture.beginDrag();
+    gesture.endDrag(false, 0);
+    harness.scheduler.flushAll();
+    expect(gesture.isActive()).toBe(false);
+    expect(harness.driver.getSnapshot().mode).toBe("detached");
+    gesture.beginDrag();
+    gesture.endDrag(true, 0);
+    gesture.reset();
+    harness.scheduler.flushAll();
+    expect(harness.driver.getSnapshot().mode).toBe("detached");
+    expect(harness.scrollAttempts).toEqual([]);
   });
 
   it("restores sticky maintenance when a user scroll returns to the bottom", () => {

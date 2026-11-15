@@ -24,6 +24,7 @@ import type { Theme } from "@/styles/theme";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { useKeyboardStreamInset } from "@/keyboard/shift";
 import { shouldAnimateNativeScrollToBottom } from "./native-scroll-animation";
+import { createNativeScrollGesture } from "./native-scroll-gesture";
 import { useRevisedHistoryRows } from "./history-row-revision";
 import { useBottomAnchorController } from "./bottom-anchor-controller";
 import { useScrollKeyboardDismiss } from "./scroll-keyboard-dismiss/use-scroll-keyboard-dismiss";
@@ -53,6 +54,7 @@ const DEFAULT_MAINTAIN_VISIBLE_CONTENT_POSITION = Object.freeze({
   minIndexForVisible: 0,
   autoscrollToTopThreshold: 0,
 });
+const READING_MAINTAIN_VISIBLE_CONTENT_POSITION = Object.freeze({ minIndexForVisible: 0 });
 
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const foregroundMutedColorMapping = (theme: Theme) => ({
@@ -105,10 +107,8 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
     contentMeasuredForKey: null as string | null,
   });
   const scrollOffsetYRef = useRef(0);
-  const isUserScrollActiveRef = useRef(false);
   const scrollKeyboardDismiss = useScrollKeyboardDismiss();
   const streamKeyboardInset = useKeyboardStreamInset();
-  const userScrollEndFrameIdRef = useRef<number | null>(null);
   const programmaticScrollEventBudgetRef = useRef(0);
   const isNativeViewportSettlingRef = useRef(false);
   const nativeViewportSettlingFrameIdRef = useRef<number | null>(null);
@@ -203,13 +203,6 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
     }
   }, []);
 
-  const clearPendingUserScrollEnd = useCallback(() => {
-    if (userScrollEndFrameIdRef.current !== null) {
-      cancelAnimationFrame(userScrollEndFrameIdRef.current);
-      userScrollEndFrameIdRef.current = null;
-    }
-  }, []);
-
   const markNativeViewportSettling = useCallback(() => {
     clearNativeViewportSettling();
     isNativeViewportSettlingRef.current = true;
@@ -277,12 +270,32 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
     },
     scrollToBottom,
   });
+  const beginUserScroll = useStableEvent(() => bottomAnchorController.beginUserScroll());
+  const endUserScroll = useStableEvent((isNearBottom: boolean) =>
+    bottomAnchorController.endUserScroll({ isNearBottom }),
+  );
+  const userScrollGesture = useMemo(
+    () =>
+      createNativeScrollGesture({
+        platform: Platform.OS,
+        begin: beginUserScroll,
+        end: endUserScroll,
+        requestFrame: (callback) => requestAnimationFrame(callback),
+        cancelFrame: (handle) => cancelAnimationFrame(handle as number),
+      }),
+    [beginUserScroll, endUserScroll],
+  );
   // Android's maintainVisibleContentPosition ignores the list inversion transform and
   // fights the controller's offset-zero correction while the live header grows.
-  const maintainVisibleContentPosition =
-    Platform.OS === "android" && bottomAnchorController.mode === "sticky-bottom"
-      ? undefined
-      : DEFAULT_MAINTAIN_VISIBLE_CONTENT_POSITION;
+  let maintainVisibleContentPosition: typeof READING_MAINTAIN_VISIBLE_CONTENT_POSITION | undefined =
+    DEFAULT_MAINTAIN_VISIBLE_CONTENT_POSITION;
+  if (Platform.OS === "android") {
+    // Preserve the reader's row as streaming content grows, without native auto-follow.
+    maintainVisibleContentPosition =
+      bottomAnchorController.mode === "sticky-bottom"
+        ? undefined
+        : READING_MAINTAIN_VISIBLE_CONTENT_POSITION;
+  }
   const topOverlayInset = useStreamTopOverlayInset();
   // The list is inverted, so its content's bottom padding is the visual top.
   const listContentContainerStyle = useMemo(
@@ -323,8 +336,7 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
       contentMeasuredForKey: null,
     };
     scrollOffsetYRef.current = 0;
-    isUserScrollActiveRef.current = false;
-    clearPendingUserScrollEnd();
+    userScrollGesture.reset();
     clearNativeViewportSettling();
     isNativeViewportSettlingRef.current = false;
     historyStartReadyRef.current = false;
@@ -337,11 +349,11 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
     });
     return () => {
       cancelAnimationFrame(frame);
-      clearPendingUserScrollEnd();
+      userScrollGesture.reset();
       historyStartSettleSchedulerRef.current?.cancel();
       historyStartSettleSchedulerRef.current = null;
     };
-  }, [agentId, clearNativeViewportSettling, clearPendingUserScrollEnd, evaluateHistoryStart]);
+  }, [agentId, clearNativeViewportSettling, userScrollGesture, evaluateHistoryStart]);
 
   useEffect(() => () => clearNativeViewportSettling(), [clearNativeViewportSettling]);
 
@@ -352,6 +364,8 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
   useEffect(() => {
     const handle: StreamViewportHandle = {
       scrollToBottom: (reason = "jump-to-bottom") => {
+        userScrollGesture.reset();
+        bottomAnchorController.endUserScroll({ isNearBottom: false });
         bottomAnchorController.requestLocalAnchor({
           agentId,
           reason,
@@ -369,7 +383,7 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
         viewportRef.current = null;
       }
     };
-  }, [agentId, bottomAnchorController, markNativeViewportSettling, viewportRef]);
+  }, [agentId, bottomAnchorController, markNativeViewportSettling, viewportRef, userScrollGesture]);
 
   const isScrollEventNearBottom = useStableEvent(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -405,8 +419,11 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
 
     evaluateHistoryStart();
 
+    if (userScrollGesture.isActive() && !nearBottom) {
+      bottomAnchorController.detachByUser();
+    }
     if (
-      !isUserScrollActiveRef.current &&
+      !userScrollGesture.isActive() &&
       programmaticScrollEventBudgetRef.current > 0 &&
       contentOffset.y <= 8
     ) {
@@ -421,10 +438,8 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
   });
 
   const handleScrollBeginDrag = useStableEvent((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    clearPendingUserScrollEnd();
-    isUserScrollActiveRef.current = true;
+    userScrollGesture.beginDrag();
     scrollKeyboardDismiss.onScrollBeginDrag(event);
-    bottomAnchorController.beginUserScroll();
     const rearmed = rearmHistoryStartPagination(historyStartPaginationStateRef.current);
     if (rearmed !== historyStartPaginationStateRef.current) {
       historyStartPaginationStateRef.current = rearmed;
@@ -433,35 +448,20 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
     }
   });
 
-  // Defer drag end so momentum can take ownership, but capture the terminal
-  // gesture position now because layout may move the viewport in the meantime.
   const handleScrollEndDrag = useStableEvent((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const isNearBottom = isScrollEventNearBottom(event);
     scrollKeyboardDismiss.onScrollEndDrag(event);
 
-    clearPendingUserScrollEnd();
-    userScrollEndFrameIdRef.current = requestAnimationFrame(() => {
-      userScrollEndFrameIdRef.current = null;
-      isUserScrollActiveRef.current = false;
-      bottomAnchorController.endUserScroll({ isNearBottom });
-    });
+    userScrollGesture.endDrag(isNearBottom, event.nativeEvent.velocity?.y);
   });
 
   const handleMomentumScrollBegin = useStableEvent(() => {
-    clearPendingUserScrollEnd();
+    userScrollGesture.beginMomentum();
   });
 
   const handleMomentumScrollEnd = useStableEvent(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      // Android can emit momentum-end after a programmatic anchor correction.
-      // Only momentum that still owns the user gesture may settle scroll intent.
-      if (!isUserScrollActiveRef.current) {
-        return;
-      }
-      const isNearBottom = isScrollEventNearBottom(event);
-      clearPendingUserScrollEnd();
-      isUserScrollActiveRef.current = false;
-      bottomAnchorController.endUserScroll({ isNearBottom });
+      userScrollGesture.endMomentum(isScrollEventNearBottom(event));
     },
   );
 

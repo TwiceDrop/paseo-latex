@@ -1,5 +1,6 @@
 import type { AttachmentMetadata } from "./types";
 import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import { DaemonConnectionError } from "@getpaseo/client/internal/daemon-client";
 import { i18n } from "@/i18n/i18next";
 import { createSharedMessageStore, type SharedAttachmentClient } from "./shared-message-store";
 
@@ -16,9 +17,12 @@ const stores = new WeakMap<
 
 export function getSharedMessageStore(client: SharedMessageClient) {
   const info = client.getLastServerInfoMessage();
+  if (!info) {
+    throw new DaemonConnectionError(i18n.t("common.errors.daemonClientDisconnected"));
+  }
   // COMPAT(sharedMessageFiles): added in latex-v0.15.4-r3. Keep until official hosts
   // publish durable attachment references in canonical user messages.
-  if (!info?.features?.workspaceFileEditing || !info.features.canonicalSubmittedPrompts) {
+  if (!info.features?.workspaceFileEditing || !info.features.canonicalSubmittedPrompts) {
     throw new Error(i18n.t("message.attachments.sharedHostRequired"));
   }
   const existing = stores.get(client);
@@ -33,6 +37,15 @@ export function getSharedMessageStore(client: SharedMessageClient) {
   });
   stores.set(client, { serverId: info.serverId, store });
   return store;
+}
+
+export function isSharedAttachmentConnectionError(error: unknown): boolean {
+  if (error instanceof DaemonConnectionError) return true;
+  return error instanceof Error && error.cause instanceof DaemonConnectionError;
+}
+
+export function retrySharedAttachmentRead(failureCount: number, error: unknown): boolean {
+  return failureCount < 2 && isSharedAttachmentConnectionError(error);
 }
 
 export async function shareMessageAttachments(

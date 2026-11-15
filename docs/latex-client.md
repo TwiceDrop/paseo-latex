@@ -175,6 +175,12 @@ and whose sender cache is gone. Missing metadata means an ordinary old text row;
 read failures and malformed metadata show a retry action instead of silently
 claiming successful synchronization.
 
+During a disconnect, missing handshake data is a connection error, not evidence
+that the Host lacks attachment support. Reconnection invalidates attachment queries
+for that Host, with reads resolving the current client at execution time. Only
+transient connection failures get bounded retries; permission and malformed-data
+errors remain visible. Inactive panels and background rows retain their read gates.
+
 ## Local Android builds
 
 For Android, install JDK 21, the Android SDK/NDK required by Expo 57 / RN 0.86,
