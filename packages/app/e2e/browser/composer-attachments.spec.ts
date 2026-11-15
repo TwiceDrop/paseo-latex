@@ -3,6 +3,10 @@ import { clickNewChat } from "../support/helpers/launcher";
 import { expectComposerVisible } from "../support/helpers/composer";
 import { expectAgentIdle } from "../support/helpers/agent-stream";
 import {
+  readScrollMetrics,
+  scrollChatAwayFromBottom,
+} from "../support/helpers/agent-bottom-anchor";
+import {
   openAttachmentMenu,
   expectAttachmentSheetRowsOnTitleRail,
   openGithubPickerFromMenu,
@@ -434,7 +438,17 @@ for (const mode of ["existing chat", "initial prompt"] as const) {
         receiver.getByRole("button", { name: "Open file: config.json", exact: true }),
       ).toBeVisible();
       await expect(receiver.getByTestId("shared-attachments-error")).toHaveCount(0);
-      await receiver.getByRole("button", { name: "Open file: config.json", exact: true }).click();
+      // A restored long conversation follows its latest message. Playwright's implicit
+      // scrollIntoView does not express user scroll intent, so the bottom anchor can
+      // undo it before the click lands. Scroll like a reader first.
+      const metrics = await readScrollMetrics(receiver);
+      if (metrics.contentHeight - metrics.viewportHeight > 100) {
+        await scrollChatAwayFromBottom(receiver, { deltaY: -500, minDistanceFromBottom: 0 });
+      }
+      const file = receiver.getByRole("button", { name: "Open file: config.json", exact: true });
+      await file.scrollIntoViewIfNeeded();
+      await expect(file).toBeInViewport({ ratio: 1 });
+      await file.click();
       await expect(
         receiver.getByTestId("file-panel-download").filter({ visible: true }),
       ).toBeEnabled();

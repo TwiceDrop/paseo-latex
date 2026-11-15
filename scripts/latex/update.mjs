@@ -39,6 +39,17 @@ if (upstream !== "https://github.com/getpaseo/paseo.git") {
 }
 if (!values["dry-run"]) run({ command: "git", args: ["fetch", "upstream", "--tags"] });
 const target = git(["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`]);
+const catalogFile = path.join(repoRoot, "scripts/latex/patch-catalog.json");
+const catalog = JSON.parse(readFileSync(catalogFile, "utf8"));
+const forward = spawnSync("git", ["merge-base", "--is-ancestor", catalog.upstream.commit, target], {
+  cwd: repoRoot,
+  windowsHide: true,
+});
+if (forward.error) throw forward.error;
+if (forward.status !== 0)
+  throw new Error(
+    "The target must contain the recorded upstream base; refusing to move the patch baseline backwards or onto another history.",
+  );
 process.stdout.write(
   `LaTeX maintenance branch: ${git(["rev-parse", "--short", "HEAD"])}\nUpstream target: ${ref} (${target})\n`,
 );
@@ -73,8 +84,6 @@ if (!values["dry-run"]) {
   run({ command: "npm", args: ["run", "lint"] });
   run({ command: "npm", args: ["run", "latex:verify", "--", "--suite", "unit"] });
   run({ command: "git", args: ["diff", "--check"] });
-  const catalogFile = path.join(repoRoot, "scripts/latex/patch-catalog.json");
-  const catalog = JSON.parse(readFileSync(catalogFile, "utf8"));
   catalog.upstream = { tag: ref, commit: target };
   writeFileSync(catalogFile, `${JSON.stringify(catalog, null, 2)}\n`);
   process.stdout.write(
