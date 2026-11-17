@@ -56,6 +56,10 @@ signed APK and its `sh.paseo.latex` identity, then removes the signing files.
 Both build options share the revision input; a new upstream version starts at 1.
 Successful builds are available as Actions artifacts; they do not create a release.
 
+Source checks and installer builds run independently; publication still requires all three to pass.
+Create the release tag and draft only after those jobs succeed, so build fixes do not
+leave stale draft tags in the mirror.
+
 The workflow's `publish_only` mode publishes an existing draft personal release.
 Supply the release tag and the successful build run ID. The source, Windows and
 Android jobs must all succeed in that manual run, and its source must match the
@@ -114,7 +118,7 @@ personal installer. Copying a release cannot add an updater to an old binary.
 Windows `0.15.3-r2` and `0.15.4-r1` have an updater initialization defect that reports
 `Cannot read properties of null (reading 'request')`. Manually install a fixed
 Windows build once: `0.15.3-r3` retains the older base for upgrade testing, while
-`0.15.4-r5` is the current fixed version. It includes shared chat attachments and
+`0.16.0-r1` is the current fixed version. It includes shared chat attachments and
 the [renderer optimizations and reusable patch workflow](latex-plugin-decisions.md),
 plus attachment reconnection recovery and native streaming scroll fixes.
 The Android updater is not affected.

@@ -116,3 +116,13 @@
 - 云端验证：492 项客户端单元、68 项浏览器、14 项导航/文档/Mermaid 场景、3 项跨设备/官方 Host 附件场景通过；另通过 222 项 Host、38 项桌面更新器和 38 项工作流检查，类型、lint、格式、正式网页导出及补丁重建通过。
 - 发布验证：保留原 Android 签名和应用身份；镜像下载并校验四个文件的完整 SHA-256。实际客户端解析器确认 CNB latest 为 `0.15.4-r5`、Android `versionCode=1500405`，Windows 清单为 `0.15.4-latex.5`，下载地址绑定本次标签。Windows 包内更新器通过首次请求、完整下载及损坏拒绝检查；没有 Android 真机手势或覆盖安装验证。
 - [补丁归档](https://github.com/TwiceDrop/paseo-latex/actions/runs/43729207492/artifacts/14168291335)的补丁 SHA-256 为 `a02513117d6f1d4c05451a509e8988a87e4da395f172d7faa1a745bacdf0abe5`，重建 tree 为 `4a8a481f0daba6b24b51ab7e3fbfbe01de391120`，无未归类文件。
+
+## LATEX-010：同步官方 v0.16.0
+
+- [x] 2026-11-17 同步官方 `v0.16.0`（`c54bc39e7997c03a07402c09df2e825889432557`），发布 `0.16.0-r1`：[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.16.0-r1) / [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.16.0-r1)。Windows x64 与 Android ARM64 同源于 `58af8c2a644e36b5964d4acf86bb8b889bf6ae39`。
+- 两个官方版本位于不同发布分支；保留双方历史，以新官方树重新合并个人差异，更新可重放补丁基准。保留 LaTeX、按需 Mermaid、离线文档预览、下载、共享附件与重连恢复、侧边栏排序/折叠、独立身份及 CNB 更新器。
+- 聊天列表采用官方正向 LegendList、原生末端定位及展开定位；Android 延迟惯性事件保护迁移到新接口，且不会覆盖拖动期间主动发送新消息的跟随意图。侧边栏折叠再展开保留官方“显示更多”状态。
+- Windows 的新版 electron-builder 已包含旧 NSIS 修复，移除重复补丁；工具准备改用显式 ZIP 依赖和带 SHA-256 的新版缓存，实际下载、解压和缓存消费已检查。源码检查与两个安装包构建并行，发布仍校验三项全部成功及相同源码。
+- 云端验证：[构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/44013633704)通过 613 项客户端单元、73 项浏览器、15 项界面和 3 项跨设备/官方 Host 附件场景；另通过 236 项 Host、38 项桌面更新器和 40 项工作流检查。类型、lint、格式、正式网页导出和补丁重建均通过。
+- [发布任务](https://github.com/TwiceDrop/paseo-latex/actions/runs/44016571115)复核 Android 原签名、包名和 `versionCode=1600001`；Windows 包内更新器通过实际下载及损坏文件拒绝检查。[CNB 镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/44016653094)复核四个附件上传后与公开下载的完整 SHA-256。实际客户端解析器确认 CNB latest 为 `0.16.0-r1`，Windows 清单为 `0.16.0-latex.1`，地址固定到本次标签。
+- [补丁归档](https://github.com/TwiceDrop/paseo-latex/actions/runs/44013633704/artifacts/14298497772)的补丁 SHA-256 为 `de56454749570fcd0a0832da48fb9960c34365eebd62d50cb9cd00709a7ec267`，重建 tree 为 `4d28f713e1bf8abc2218e3494d5558d151a6d57f`，无未归类文件。当前没有实体 Android/Windows 的手势、覆盖安装或性能测量结论；Android 沿用 low-memory 构建选项。
