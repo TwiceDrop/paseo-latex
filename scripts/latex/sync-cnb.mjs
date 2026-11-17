@@ -81,6 +81,21 @@ export function publicationPatch(source, target, commit, mirroredCommit, latestT
   };
 }
 
+export function assertUnpublishedTagRepair(tag, github, target, commit) {
+  if (
+    !tagPattern.test(tag) ||
+    !/^[a-f0-9]{40}$/.test(commit) ||
+    github.tagName !== tag ||
+    github.isDraft !== true ||
+    github.targetCommitish !== commit ||
+    !Array.isArray(github.assets) ||
+    github.assets.length !== 0 ||
+    target !== null
+  ) {
+    throw new Error("Tag repair requires the matching empty GitHub draft and no CNB release");
+  }
+}
+
 function command(program, args, options = {}) {
   const result = spawnSync(program, args, {
     encoding: "utf8",
@@ -204,6 +219,13 @@ function syncSource() {
     (branch) => `refs/remotes/origin/${branch}:refs/heads/${branch}`,
   );
   refs.push(...tags.map((tag) => `refs/tags/${tag}:refs/tags/${tag}`));
+  pushToCnb(refs);
+  console.log(
+    `Synchronized main, paseo-latex and ${tags.length} personal release tags without force or deletions`,
+  );
+}
+
+function pushToCnb(refs, options = []) {
   const env = { ...process.env, GIT_TERMINAL_PROMPT: "0" };
   for (const key of Object.keys(env)) {
     if (key.startsWith("GIT_TRACE") || key === "GIT_CURL_VERBOSE") delete env[key];
@@ -222,13 +244,44 @@ function syncSource() {
       "push",
       "--atomic",
       `https://cnb.cool/${cnbRepo}.git`,
+      ...options,
       ...refs,
     ],
     { env },
   );
-  console.log(
-    `Synchronized main, paseo-latex and ${tags.length} personal release tags without force or deletions`,
+}
+
+async function repairUnpublishedTag(tag) {
+  if (!tagPattern.test(tag) || process.env.RELEASE_TAG) {
+    throw new Error(
+      "Specify only one unpublished personal tag to repair; repair does not publish a release",
+    );
+  }
+  const ref = `refs/tags/${tag}`;
+  const remoteObject = command("git", ["ls-remote", `https://cnb.cool/${cnbRepo}.git`, ref]).split(
+    /\s+/,
+  )[0];
+  const localObject = command("git", ["rev-parse", ref]);
+  if (!remoteObject || remoteObject === localObject) return;
+  if (!/^[a-f0-9]{40}$/.test(remoteObject)) throw new Error("Invalid remote tag object");
+  const commit = command("git", ["rev-parse", `${ref}^{commit}`]);
+  // gh release view also reads drafts, which the public releases/tags endpoint can omit.
+  const github = JSON.parse(
+    command("gh", [
+      "release",
+      "view",
+      tag,
+      "--repo",
+      githubRepo,
+      "--json",
+      "tagName,isDraft,targetCommitish,assets",
+    ]),
   );
+  const target = await cnb(`/tags/${tag}`, { allowMissing: true });
+  assertUnpublishedTagRepair(tag, github, target, commit);
+  pushToCnb([`${ref}:${ref}`], [`--force-with-lease=${ref}:${remoteObject}`]);
+  if (mirroredTagCommit(tag) !== commit) throw new Error("Repaired tag does not match GitHub");
+  console.log(`Repaired empty unpublished tag ${tag} to ${commit}`);
 }
 
 function mirroredTagCommit(tag) {
@@ -372,6 +425,11 @@ async function mirrorRelease(source, directory) {
 
 async function main() {
   if (!process.env.CNB_TOKEN) throw new Error("Set the repository Actions secret CNB_TOKEN first");
+  if (process.env.REPAIR_UNPUBLISHED_TAG) {
+    await repairUnpublishedTag(process.env.REPAIR_UNPUBLISHED_TAG);
+    syncSource();
+    return;
+  }
   if (process.env.SOURCE_ONLY === "true") {
     syncSource();
     return;

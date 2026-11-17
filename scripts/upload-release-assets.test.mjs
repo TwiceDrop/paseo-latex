@@ -12,9 +12,38 @@ import {
   verifyWindowsUpdateManifest,
   writeReleaseMetadata,
 } from "./latex/release-manifest.mjs";
-import { releaseFiles, verifySums, verifyContent, publicationPatch } from "./latex/sync-cnb.mjs";
+import {
+  releaseFiles,
+  verifySums,
+  verifyContent,
+  publicationPatch,
+  assertUnpublishedTagRepair,
+} from "./latex/sync-cnb.mjs";
 
 const noSleep = () => Promise.resolve();
+
+test("CNB tag repair refuses published releases, assets and mismatched draft sources", () => {
+  const tag = "latex-v0.16.0-r1";
+  const commit = "a".repeat(40);
+  const github = { tagName: tag, isDraft: true, targetCommitish: commit, assets: [] };
+  const target = { tag_name: tag, draft: true, assets: [] };
+  assert.doesNotThrow(() => assertUnpublishedTagRepair(tag, github, null, commit));
+  assert.throws(() => assertUnpublishedTagRepair(tag, github, target, commit));
+  for (const changed of [
+    { ...github, isDraft: false },
+    { ...github, assets: [{ name: "installer.apk" }] },
+    { ...github, targetCommitish: "b".repeat(40) },
+    { ...github, tagName: "latex-v0.15.4-r5" },
+  ])
+    assert.throws(() => assertUnpublishedTagRepair(tag, changed, null, commit));
+  for (const changed of [
+    { ...target, draft: false },
+    { ...target, assets: [{ name: "installer.apk" }] },
+    { ...target, tag_name: "latex-v0.15.4-r5" },
+  ])
+    assert.throws(() => assertUnpublishedTagRepair(tag, github, changed, commit));
+  assert.throws(() => assertUnpublishedTagRepair("main", github, null, commit));
+});
 
 test("personal release metadata binds the updater to the exact CNB installer and revision", async () => {
   const directory = await mkdtemp(join(tmpdir(), "paseo-release-"));

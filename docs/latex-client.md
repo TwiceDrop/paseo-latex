@@ -101,6 +101,12 @@ CNB may return `tag_commitish` as `refs/tags/<tag>` for an annotated tag. The mi
 also resolves that remote tag to its commit; a matching ref name alone is not
 enough to validate the release source.
 
+If an empty, unpublished release draft was retagged during validation, normal mirroring
+refuses to overwrite the existing CNB tag. Dispatch **LaTeX CNB Mirror** with only
+`repair_unpublished_tag` set to that tag. Repair requires the matching empty GitHub
+draft and no CNB release (including drafts); it updates only that tag with an exact
+lease, then syncs source without publishing. Published tags require a new revision.
+
 Public versioned downloads use
 `https://cnb.cool/twicedrop/paseo-latex/-/releases/download/<tag>/<filename>`.
 Clients installed before `0.15.3-r2` need one manual installation of the new
