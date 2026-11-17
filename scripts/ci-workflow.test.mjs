@@ -38,6 +38,59 @@ test("CNB mirroring uses trusted main and excludes pull-request workflow complet
   assert.doesNotMatch(source, /run:.*\$\{\{/);
 });
 
+test("parallel personal builds publish only when every job succeeds at the tagged source", () => {
+  const source = readFileSync(new URL(".github/workflows/latex-source.yml", repoRoot), "utf8");
+  const script = source.match(
+    /EXPECTED_SOURCE_SHA=.*?node --input-type=module <<'JS'\n([\s\S]*?)\n          JS/,
+  )?.[1];
+  assert.ok(script, "Run the publisher's actual source and job verification");
+  const directory = mkdtempSync(join(tmpdir(), "latex-publication-gate-"));
+  const repo = "TwiceDrop/paseo-latex";
+  const sha = "a".repeat(40);
+  const run = {
+    head_sha: sha,
+    head_repository: { full_name: repo },
+    event: "workflow_dispatch",
+    path: ".github/workflows/latex-source.yml",
+  };
+  const jobs = ["source", "windows", "android"].map((name) => ({ name, conclusion: "success" }));
+  const check = (candidateRun, candidateJobs) => {
+    writeFileSync(join(directory, "build-run.json"), JSON.stringify(candidateRun));
+    writeFileSync(join(directory, "build-jobs.json"), JSON.stringify({ jobs: candidateJobs }));
+    return spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+      cwd: directory,
+      encoding: "utf8",
+      env: { ...process.env, EXPECTED_SOURCE_SHA: sha, GITHUB_REPOSITORY: repo },
+    });
+  };
+  try {
+    const valid = check(run, jobs);
+    assert.equal(valid.status, 0, valid.stderr);
+    for (const name of ["source", "windows", "android"]) {
+      for (const conclusion of ["failure", "cancelled", null]) {
+        assert.notEqual(
+          check(
+            run,
+            jobs.map((job) => (job.name === name ? { ...job, conclusion } : job)),
+          ).status,
+          0,
+        );
+      }
+      assert.notEqual(
+        check(
+          run,
+          jobs.filter((job) => job.name !== name),
+        ).status,
+        0,
+      );
+    }
+    assert.notEqual(check({ ...run, head_sha: "b".repeat(40) }, jobs).status, 0);
+    assert.notEqual(check(run, [...jobs, jobs[0]]).status, 0);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 const gatedCiJobs = new Map([
   ["quality", { name: "quality", contracts: ["format", "quality", "relay", "sdk"] }],
   ["typecheck", { name: "typecheck", contract: "quality" }],

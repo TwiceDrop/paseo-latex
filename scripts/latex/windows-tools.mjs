@@ -60,22 +60,11 @@ async function download(url, destination, checksum, algorithm = "sha512", encodi
   return bytes;
 }
 
-export async function prepareWindowsTools({
-  directory,
-  cache,
-  sevenZip = require("7zip-bin").path7za,
-}) {
+export async function prepareWindowsTools({ directory, cache }) {
   await fs.mkdir(directory, { recursive: true });
-  const extract = async (archive, destination) => {
-    await fs.mkdir(destination, { recursive: true });
-    const result = spawnSync(
-      sevenZip,
-      ["x", "-y", "-bd", "-bso0", "-bsp0", "-xr!darwin", "-xr!linux", archive, `-o${destination}`],
-      { stdio: "inherit" },
-    );
-    if (result.error) throw result.error;
-    if (result.status !== 0) throw new Error(`Unable to extract ${archive}`);
-  };
+  // This is only the Electron ZIP. electron-builder owns extraction of its toolsets below.
+  // Keep the dependency explicit: electron-builder 26.18 no longer installs 7zip-bin.
+  const extract = require("extract-zip");
   const version = require("electron/package.json").version;
   const base = `https://github.com/electron/electron/releases/download/v${version}`;
   const fileName = `electron-v${version}-win32-x64.zip`;
@@ -94,39 +83,50 @@ export async function prepareWindowsTools({
   console.log(`[windows-latex] Preparing official Electron ${version} (SHA-256 ${checksum})`);
   await download(`${base}/${fileName}`, archive, checksum, "sha256", "hex");
   const electronDist = path.join(directory, `electron-${version}`);
-  await extract(archive, electronDist);
+  await extract(archive, { dir: path.resolve(electronDist) });
   // Match electron-builder's normal distribution cleanup for a custom local dist.
   await fs.rm(path.join(electronDist, "resources/default_app.asar"), { force: true });
   await fs.rm(path.join(electronDist, "resources/app"), { recursive: true, force: true });
   await fs.rm(path.join(electronDist, "version"), { force: true });
 
-  // electron-builder 26.18 uses an archive cache and validates/extracts each tool itself.
-  // Keep the legacy toolsets selected by its default configuration; hashes are pinned.
+  // Seed electron-builder 26.18's verified archive cache. It owns extraction and
+  // cache-state metadata; the new 7zip toolset is needed to unpack the legacy NSIS tools.
+  // SHA-256 values come from its toolsets/windows.js and toolsets/7zip.js.
   const tools = [
     [
       "winCodeSign-2.6.0",
-      "6LQI2d9BPC3Xs0ZoTQe1o3tPiA28c7+PY69Q9i/pD8lY45psMtHuLwv3vRckiVr3Zx1cbNyLlBR8STwCdcHwtA==",
+      "winCodeSign-2.6.0.7z",
+      "cdaec7154dda7cc31f88d886e2489379a0625a737d610b5ae7f62a12f16743a4",
     ],
     [
       "nsis-3.0.4.1",
-      "VKMiizYdmNdJOWpRGz4trl4lD++BvYP2irAXpMilheUP0pc93iKlWAoP843Vlraj8YG19CVn0j+dCo/hURz9+Q==",
+      "nsis-3.0.4.1.7z",
+      "9877df902530f96357d13a7a31ae2b9df67f48b11ffc9a1700a7c961574ec5fa",
     ],
     [
       "nsis-resources-3.4.1",
-      "Dqd6g+2buwwvoG1Vyf6BHR1b+25QMmPcwZx40atOT57gH27rkjOei1L0JTldxZu4NFoEmW4kJgZ3DlSWVON3+Q==",
+      "nsis-resources-3.4.1.7z",
+      "593a9a92ef958321293ac6a2ee61e64bf1bd543142a5bd6b3d310709cc924103",
+    ],
+    [
+      "7zip@1.0.0",
+      "7zip-win-x64.tar.gz",
+      "be071f15bd6da2f78fe81c6ddef2009b0c4d8a51f36b780cb806c7e6df95e1b3",
     ],
   ];
-  for (const [name, sha512] of tools) {
-    console.log(`[windows-latex] Preparing verified ${name}`);
-    const file = path.join(directory, `${name}.7z`);
+  for (const [release, filename, sha256] of tools) {
+    console.log(`[windows-latex] Preparing verified ${filename}`);
+    const file = path.join(directory, filename);
     await download(
-      `https://github.com/electron-userland/electron-builder-binaries/releases/download/${name}/${name}.7z`,
+      `https://github.com/electron-userland/electron-builder-binaries/releases/download/${release}/${filename}`,
       file,
-      sha512,
+      sha256,
+      "sha256",
+      "hex",
     );
-    const archiveDirectory = path.join(cache, name);
+    const archiveDirectory = path.join(cache, release);
     await fs.mkdir(archiveDirectory, { recursive: true });
-    await fs.copyFile(file, path.join(archiveDirectory, `${name}.7z`));
+    await fs.copyFile(file, path.join(archiveDirectory, filename));
   }
   return electronDist;
 }

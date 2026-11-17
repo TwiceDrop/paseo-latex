@@ -150,7 +150,6 @@ jobs:
 
   android:
     if: github.repository == 'TwiceDrop/paseo-latex' && github.event_name == 'workflow_dispatch' && inputs.android
-    needs: source
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -227,7 +226,6 @@ jobs:
 
   windows:
     if: github.repository == 'TwiceDrop/paseo-latex' && github.event_name == 'workflow_dispatch' && inputs.windows
-    needs: source
     runs-on: windows-latest
     timeout-minutes: 45
     steps:

@@ -141,6 +141,7 @@
     "electron": "44.2.0",
     "electron-builder": "26.18.0",
     "expo-module-scripts": "^5.0.8",
+    "extract-zip": "2.0.1",
     "get-port-cli": "^3.0.0",
     "js-yaml": "^4.1.1",
     "knip": "^5.82.1",
