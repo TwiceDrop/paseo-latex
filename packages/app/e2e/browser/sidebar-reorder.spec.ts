@@ -303,8 +303,7 @@ async function expectRevealSurvivesSortingAndCollapse(
   await page
     .getByTestId(`sidebar-collapsed-project-${projectEquivalenceViewKey(seed.projectKey)}`)
     .click();
-  await expectWorkspaceOrder(rows, ids.slice(0, 7));
-  await revealWorkspaces(group, "Show more");
+  // Upstream 0.16 keeps expansion in the sidebar owner, including while our collapsed shelf hides it.
   await expectWorkspaceOrder(rows, ids);
   await seed.client.sendAgentMessage(agent.id, "expanded overflow");
   await seed.client.waitForFinish(agent.id, 15_000);
