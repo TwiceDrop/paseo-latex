@@ -100,26 +100,23 @@ export async function prepareWindowsTools({
   await fs.rm(path.join(electronDist, "resources/app"), { recursive: true, force: true });
   await fs.rm(path.join(electronDist, "version"), { force: true });
 
-  // Match electron-builder 26.8.1 / app-builder's pinned tools and cache keys.
-  // Checksums come from app-builder's tool.go and electron-builder's nsisUtil.js.
+  // electron-builder 26.18 uses an archive cache and validates/extracts each tool itself.
+  // Keep the legacy toolsets selected by its default configuration; hashes are pinned.
   const tools = [
     [
-      "winCodeSign-2.6.0",
       "winCodeSign-2.6.0",
       "6LQI2d9BPC3Xs0ZoTQe1o3tPiA28c7+PY69Q9i/pD8lY45psMtHuLwv3vRckiVr3Zx1cbNyLlBR8STwCdcHwtA==",
     ],
     [
       "nsis-3.0.4.1",
-      "nsis-3.0.4.1-nsis-3.0.4.1",
       "VKMiizYdmNdJOWpRGz4trl4lD++BvYP2irAXpMilheUP0pc93iKlWAoP843Vlraj8YG19CVn0j+dCo/hURz9+Q==",
     ],
     [
       "nsis-resources-3.4.1",
-      "nsis-resources-3.4.1-nsis-resources-3.4.1",
       "Dqd6g+2buwwvoG1Vyf6BHR1b+25QMmPcwZx40atOT57gH27rkjOei1L0JTldxZu4NFoEmW4kJgZ3DlSWVON3+Q==",
     ],
   ];
-  for (const [name, cacheKey, sha512] of tools) {
+  for (const [name, sha512] of tools) {
     console.log(`[windows-latex] Preparing verified ${name}`);
     const file = path.join(directory, `${name}.7z`);
     await download(
@@ -127,7 +124,9 @@ export async function prepareWindowsTools({
       file,
       sha512,
     );
-    await extract(file, path.join(cache, cacheKey.split("-")[0], cacheKey));
+    const archiveDirectory = path.join(cache, name);
+    await fs.mkdir(archiveDirectory, { recursive: true });
+    await fs.copyFile(file, path.join(archiveDirectory, `${name}.7z`));
   }
   return electronDist;
 }

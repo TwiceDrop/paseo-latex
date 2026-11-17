@@ -12,7 +12,7 @@ another renderer or replacing an existing client feature with a Host plugin.
 
 The personal source repository is `https://github.com/TwiceDrop/paseo-latex.git`.
 Its default `main` branch includes the personal patches; `paseo-latex` is the
-maintenance branch, based on upstream `v0.15.4`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
+maintenance branch, based on upstream `v0.16.0`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
 build machines also need the native compiler prerequisites required by the target.
 
 ```sh
@@ -42,7 +42,7 @@ are restricted to `getpaseo/paseo`; they do not deploy official services or publ
 releases from this personal repository.
 
 For the independent Windows installer, use a Windows machine and
-`npm run windows:latex -- --revision 5`, or manually run **LaTeX Source Build**
+`npm run windows:latex -- --revision 1`, or manually run **LaTeX Source Build**
 with its Windows option enabled. Linux cloud environments cannot directly run
 the Windows-only installer script. Increase the revision after each delivery.
 
@@ -452,7 +452,7 @@ opting into API downloads also requires the GitHub CLI.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.15.4
+npm run latex:update -- --ref v0.16.0
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,
@@ -463,6 +463,14 @@ Resolve the upstream merge in a review branch, review feature overlap and update
 catalog's upstream baseline only after checks pass. Commit the refreshed catalog
 and generated assets before the next update. See the linked patch guide for export
 and exact tree reconstruction; a conflict-free patch still requires behavioral tests.
+
+The official `v0.15.4` and `v0.16.0` tags are on different release branches.
+The update command deliberately rejects a target that does not descend from the
+recorded baseline. For that transition, review a merge in an isolated branch and
+replay only the personal delta relative to `v0.15.4` onto the exact `v0.16.0` tree.
+Keep both histories, accept new official implementations, then update the baseline
+after validation. Do not remove the ancestry guard or carry old official backports
+into the new release as personal patches.
 
 To inspect an already fetched target without merging:
 

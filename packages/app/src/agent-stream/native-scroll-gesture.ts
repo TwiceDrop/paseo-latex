@@ -2,7 +2,7 @@
 export function createNativeScrollGesture(input: {
   platform: string;
   begin: () => void;
-  end: (isNearBottom: boolean) => void;
+  end: (isAtEnd: boolean) => void;
   requestFrame: (callback: () => void) => unknown;
   cancelFrame: (handle: unknown) => void;
 }) {
@@ -21,7 +21,7 @@ export function createNativeScrollGesture(input: {
       ownsMomentum = true;
       input.begin();
     },
-    endDrag(isNearBottom: boolean, velocityY?: number) {
+    endDrag(isAtEnd: boolean, velocityY?: number) {
       clearEnd();
       if (!active) return;
       // Android emits a momentum lifecycle even for a zero-velocity release.
@@ -31,21 +31,23 @@ export function createNativeScrollGesture(input: {
         endFrame = null;
         active = false;
         ownsMomentum = false;
-        input.end(isNearBottom);
+        input.end(isAtEnd);
       });
     },
     beginMomentum() {
       if (!ownsMomentum) return;
       clearEnd();
-      active = true;
-      input.begin();
+      if (!active) {
+        active = true;
+        input.begin();
+      }
     },
-    endMomentum(isNearBottom: boolean) {
+    endMomentum(isAtEnd: boolean) {
       if (!ownsMomentum) return;
       clearEnd();
       active = false;
       ownsMomentum = false;
-      input.end(isNearBottom);
+      input.end(isAtEnd);
     },
     reset() {
       clearEnd();

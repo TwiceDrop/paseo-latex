@@ -109,7 +109,8 @@
 - [x] 代码排查：原生聊天使用倒置 `FlatList`，实时内容放在 `ListHeaderComponent`；Android 只在 `sticky-bottom` 时禁用 `maintainVisibleContentPosition`，脱离底部阅读历史时仍启用。React Native 的该辅助器会在布局变化后主动调用 `scrollToPreservingMomentum`，与 JS 底部控制器是两条滚动调整路径。
 - [x] 核对这些滚动核心文件与官方 `v0.15.4` 一致。本次定向运行 `bottom-anchor-controller.test.ts`、`history-start-pagination.test.ts` 共 33 项通过，覆盖逻辑层的手动脱离、内容增长和分页；不能据此认定原生布局、手势和惯性时序无误。
 - [x] 新增真实底部控制器与原生手势状态机的时序回归：松手后的 JS 帧先执行、惯性事件延后、随后流式内容增高，旧算法出现一次错误的回底部调用；修复后没有该调用。这是受控事件序列，不是 Android 真机 trace。
-- [x] 修复：Android 拖动至惯性结束持续保留用户滚动控制权（包括零速度松手）；上翻离开底部立即解除自动跟随。阅读时保留原生可见行位置补偿、移除自动回顶阈值；主动回底部会释放手势状态，继续生成时仍可跟随。
+- [x] 0.15.4-r5 修复：Android 拖动至惯性结束持续保留用户滚动控制权（包括零速度松手）；上翻离开底部立即解除自动跟随。阅读时保留原生可见行位置补偿、移除自动回顶阈值；主动回底部会释放手势状态，继续生成时仍可跟随。
+- 0.16.0 迁移：采用官方正向 LegendList、原生末端定位与展开定位；移除旧倒置列表的配置补丁。保留 Android 延迟惯性事件保护，适配新的严格末端判断；惯性开始不会覆盖拖动期间新发消息的主动跟随请求。受控时序回归继续保留，尚无真机结论。
 - [ ] 真机复核：持续生成时慢拖/快速上划到最早消息、历史分页、回底部、生成结束与切后台恢复。当前环境无 Android 设备，不能把单元/浏览器结果当成实机验证。
 - [x] 2026-11-15 将 LATEX-008/009 修复发布为 `0.15.4-r5`：[GitHub](https://github.com/TwiceDrop/paseo-latex/releases/tag/latex-v0.15.4-r5) / [CNB](https://cnb.cool/twicedrop/paseo-latex/-/releases/tags/latex-v0.15.4-r5)。Windows x64 与 Android ARM64 同源于 `e1c4fd4f1a201b7426c9970568ba2c07b2cdbe53`；[构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/43729207492)、[发布](https://github.com/TwiceDrop/paseo-latex/actions/runs/43733135373)及[CNB 镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/43733204514)均成功。
 - 云端验证：492 项客户端单元、68 项浏览器、14 项导航/文档/Mermaid 场景、3 项跨设备/官方 Host 附件场景通过；另通过 222 项 Host、38 项桌面更新器和 38 项工作流检查，类型、lint、格式、正式网页导出及补丁重建通过。

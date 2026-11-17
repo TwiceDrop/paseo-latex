@@ -10,6 +10,7 @@ interface PanEvent {
   velocityX: number;
 }
 interface TouchEvent {
+  pointerType: number;
   changedTouches: { absoluteX: number; absoluteY: number }[];
   numberOfTouches: number;
 }
@@ -23,7 +24,7 @@ interface Manager {
 const { pans, runtime, makePan } = vi.hoisted(() => {
   class Pan {
     ref: unknown;
-    down!: (event: TouchEvent) => void;
+    down!: (event: TouchEvent, manager: Manager) => void;
     move!: (event: TouchEvent, manager: Manager) => void;
     start!: () => void;
     update!: (event: PanEvent) => void;
@@ -65,6 +66,7 @@ const { pans, runtime, makePan } = vi.hoisted(() => {
   const registeredPans: Pan[] = [];
   const fakeRuntime = {
     windowWidth: 400,
+    leftPanelWidth: 400,
     position: { value: 0 },
     openGesturesBlocked: { value: false },
     motionState: {
@@ -92,8 +94,18 @@ const { pans, runtime, makePan } = vi.hoisted(() => {
     },
   };
 });
-vi.mock("react-native-gesture-handler", () => ({ Gesture: { Pan: makePan } }));
-vi.mock("react-native-reanimated", () => ({ useSharedValue: (value: number) => ({ value }) }));
+vi.mock("react-native-gesture-handler", () => ({
+  Gesture: { Pan: makePan },
+  PointerType: { TOUCH: 0 },
+}));
+vi.mock("react-native-reanimated", () => ({
+  useSharedValue: (value: number) => ({ value }),
+  useDerivedValue: (read: () => unknown) => ({ value: read() }),
+}));
+vi.mock("@/hooks/use-pointer-capabilities", () => ({
+  usePointerCapabilities: () => ({ touchScreen: true }),
+}));
+vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
 vi.mock("react-native-worklets", () => ({ scheduleOnRN: vi.fn() }));
 vi.mock("@/constants/platform", () => ({ isWeb: false }));
 vi.mock("@/contexts/horizontal-scroll-context", () => ({
@@ -141,11 +153,12 @@ it.each([1, -1] as const)(
         value.ref === (direction === 1 ? runtime.leftOpenGestureRef : runtime.rightOpenGestureRef),
     )!;
     const touch = (distance: number): TouchEvent => ({
+      pointerType: 0,
       changedTouches: [{ absoluteX: 200 + direction * distance, absoluteY: 400 }],
       numberOfTouches: 1,
     });
     const manager = { activate: vi.fn(() => pan.start()), fail: vi.fn() };
-    pan.down(touch(0));
+    pan.down(touch(0), manager);
     pan.move(touch(99), manager);
     expect(manager.activate).not.toHaveBeenCalled();
     pan.move(touch(100), manager);

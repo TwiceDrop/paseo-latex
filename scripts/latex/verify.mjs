@@ -23,6 +23,8 @@ const suites = {
     "src/agent-stream/bottom-anchor-controller.test.ts",
     "src/agent-stream/history-start-pagination.test.ts",
     "src/agent-stream/native-scroll-animation.test.ts",
+    "src/agent-stream/native-disclosure-hold.test.ts",
+    "src/agent-stream/render-strategy.test.ts",
     "src/composer/actions.test.ts",
     "src/i18n/resources.test.ts",
     "src/components/download-toast.test.tsx",

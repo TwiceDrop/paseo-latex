@@ -1,7 +1,7 @@
 {
   "upstream": {
-    "tag": "v0.15.4",
-    "commit": "1c00b365c9e0b74c1580eba33d905d693125ae21"
+    "tag": "v0.16.0",
+    "commit": "c54bc39e7997c03a07402c09df2e825889432557"
   },
   "features": [
     {
@@ -79,7 +79,6 @@
         "packages/app/native-release-version",
         "packages/app/src/screens/settings-screen",
         "packages/desktop/",
-        "patches/app-builder-lib",
         ".github/workflows/latex-",
         "scripts/latex/"
       ],
