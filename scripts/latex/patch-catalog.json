@@ -1,7 +1,7 @@
 {
   "upstream": {
-    "tag": "v0.16.0",
-    "commit": "c54bc39e7997c03a07402c09df2e825889432557"
+    "tag": "v0.16.1",
+    "commit": "c09a3d81e772a747dd11bca43d860f3518f07c2d"
   },
   "features": [
     {

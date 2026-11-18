@@ -33,9 +33,9 @@
 # 导出已提交版本；目标目录必须尚不存在。
 npm run latex:patches -- export --out /tmp/paseo-personal-patches
 # 验证记录的基准可以精确复原。
-npm run latex:patches -- check --bundle /tmp/paseo-personal-patches --ref v0.16.0
+npm run latex:patches -- check --bundle /tmp/paseo-personal-patches --ref v0.16.1
 # 先 fetch 一个明确的新官方 tag，再只读预检。
-npm run latex:update -- --ref v0.16.0 --dry-run
+npm run latex:update -- --ref v0.16.1 --dry-run
 ```
 
 确认目标版本后才运行非 dry-run 更新。更新成功会刷新补丁目录中的官方基准；提交该目录和生成资源，再导出新补丁包。源仓库须保留基准对象（新克隆先 fetch 官方 tag），补丁包不含密钥、用户数据或未提交文件。需要在其他检出应用时，先创建干净的审阅分支，再 `git apply --3way --index /path/to/personal.patch`，检查/提交后运行下述验证。

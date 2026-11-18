@@ -12,7 +12,7 @@ another renderer or replacing an existing client feature with a Host plugin.
 
 The personal source repository is `https://github.com/TwiceDrop/paseo-latex.git`.
 Its default `main` branch includes the personal patches; `paseo-latex` is the
-maintenance branch, based on upstream `v0.16.0`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
+maintenance branch, based on upstream `v0.16.1`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
 build machines also need the native compiler prerequisites required by the target.
 
 ```sh
@@ -118,7 +118,7 @@ personal installer. Copying a release cannot add an updater to an old binary.
 Windows `0.15.3-r2` and `0.15.4-r1` have an updater initialization defect that reports
 `Cannot read properties of null (reading 'request')`. Manually install a fixed
 Windows build once: `0.15.3-r3` retains the older base for upgrade testing, while
-`0.16.0-r1` is the current fixed version. It includes shared chat attachments and
+newer personal builds include the updater fix, shared chat attachments and
 the [renderer optimizations and reusable patch workflow](latex-plugin-decisions.md),
 plus attachment reconnection recovery and native streaming scroll fixes.
 The Android updater is not affected.
@@ -462,7 +462,7 @@ opting into API downloads also requires the GitHub CLI.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.16.0
+npm run latex:update -- --ref v0.16.1
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,
