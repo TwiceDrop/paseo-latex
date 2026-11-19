@@ -26,6 +26,7 @@ const suites = {
     "src/agent-stream/native-disclosure-hold.test.ts",
     "src/agent-stream/render-strategy.test.ts",
     "src/composer/actions.test.ts",
+    "src/hooks/use-image-attachment-picker.test.ts",
     "src/i18n/resources.test.ts",
     "src/components/download-toast.test.tsx",
     "src/stores/download-store.test.ts",

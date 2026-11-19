@@ -175,6 +175,7 @@ export const fr: TranslationResources = {
     },
     attachments: {
       addImage: "Ajouter une image",
+      takePhoto: "Prendre une photo",
       pasteImage: "Coller une image",
       addFile: "Importer un fichier",
       addIssueOrPr: "Ajouter un ticket ou une PR",
@@ -1729,6 +1730,9 @@ export const fr: TranslationResources = {
     failed: "Impossible de charger l’historique plus ancien",
   },
   imageAttachmentPicker: {
+    cameraPermissionMessage:
+      "Autorisez l’accès à la caméra dans les paramètres de l’application pour prendre une photo à joindre.",
+    failedToAttachPhoto: "Impossible de joindre la photo.",
     permissionTitle: "Autorisation requise",
     permissionMessage: "Autorisez l’accès à votre photothèque pour joindre des images.",
     errorTitle: "Erreur",

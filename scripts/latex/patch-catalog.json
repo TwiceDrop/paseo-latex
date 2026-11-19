@@ -43,6 +43,7 @@
       "id": "attachments",
       "paths": [
         "packages/app/src/attachments/",
+        "packages/app/src/hooks/use-image-attachment-picker",
         "packages/app/src/composer/",
         "packages/app/src/components/message.tsx",
         "packages/app/src/components/user-message/",
@@ -51,7 +52,7 @@
         "packages/app/e2e/support/helpers/daemon-websocket-gate",
         "packages/app/e2e/browser/composer-attachments"
       ],
-      "contract": "Official Host file APIs, durable metadata before send, cross-device retrieval, bounded caches."
+      "contract": "Android camera capture into the draft, official Host file APIs, durable metadata before send, cross-device retrieval, bounded caches."
     },
     {
       "id": "navigation",

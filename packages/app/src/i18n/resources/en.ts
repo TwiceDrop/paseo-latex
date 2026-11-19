@@ -189,6 +189,7 @@ export const en = {
     },
     attachments: {
       addImage: "Add image",
+      takePhoto: "Take photo",
       pasteImage: "Paste image",
       addFile: "Upload file",
       addIssueOrPr: "Add issue or PR",
@@ -1731,6 +1732,8 @@ export const en = {
     failed: "Couldn't load older history",
   },
   imageAttachmentPicker: {
+    cameraPermissionMessage: "Allow camera access in app settings to take photos for attachments.",
+    failedToAttachPhoto: "Could not attach the photo.",
     permissionTitle: "Permission required",
     permissionMessage: "Please allow access to your photo library to attach images.",
     errorTitle: "Error",

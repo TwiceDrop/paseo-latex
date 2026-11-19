@@ -11,6 +11,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import {
   View,
   Pressable,
+  Platform,
   Text,
   StyleSheet as RNStyleSheet,
   type PressableStateCallbackType,
@@ -54,6 +55,7 @@ import {
   FileText,
   GitPullRequest,
   Image as ImageIcon,
+  Camera,
   ClipboardPaste,
   Paperclip,
 } from "lucide-react-native";
@@ -65,7 +67,11 @@ import {
   type DraftAgentControlsProps,
 } from "@/composer/agent-controls";
 import { ContextWindowMeter } from "@/components/context-window-meter";
-import { useImageAttachmentPicker } from "@/hooks/use-image-attachment-picker";
+import { isFdroidBuild } from "@/constants/build-profile";
+import {
+  useImageAttachmentPicker,
+  type ImageAttachmentSource,
+} from "@/hooks/use-image-attachment-picker";
 import {
   selectAgentSentMessages,
   selectAgentTurnPresentation,
@@ -1861,14 +1867,27 @@ function ComposerContentImpl({
     ],
   );
 
-  const handlePickImage = useCallback(async () => {
-    const newImages = await pickAndPersistImages({
-      pickImages,
-      persister: composerImageAttachmentPersister,
-    });
-    if (newImages.length === 0) return;
-    addImages(newImages);
-  }, [addImages, pickImages]);
+  const handlePickImage = useCallback(
+    async (source: ImageAttachmentSource) => {
+      try {
+        const newImages = await pickAndPersistImages({
+          pickImages: () => pickImages(source),
+          persister: composerImageAttachmentPersister,
+        });
+        if (newImages.length > 0) addImages(newImages);
+      } catch (error) {
+        console.error("[Composer] Failed to persist image:", error);
+        toastErrorRef.current(
+          t(
+            source === "camera"
+              ? "imageAttachmentPicker.failedToAttachPhoto"
+              : "imageAttachmentPicker.failedToSelect",
+          ),
+        );
+      }
+    },
+    [addImages, pickImages, t],
+  );
 
   const handlePasteImage = useCallback(async () => {
     try {
@@ -2277,10 +2296,20 @@ function ComposerContentImpl({
         label: t("composer.attachments.addImage"),
         icon: <ThemedImageIcon size={ICON_SIZE.md} uniProps={iconForegroundMutedMapping} />,
         onSelect: () => {
-          void handlePickImage();
+          void handlePickImage("library");
         },
       },
     ];
+    if (Platform.OS === "android" && !isFdroidBuild) {
+      items.push({
+        id: "camera",
+        label: t("composer.attachments.takePhoto"),
+        icon: <ThemedCamera size={ICON_SIZE.md} uniProps={iconForegroundMutedMapping} />,
+        onSelect: () => {
+          void handlePickImage("camera");
+        },
+      });
+    }
     if (isNative) {
       items.push({
         id: "paste-image",
@@ -2830,6 +2859,7 @@ const ThemedGitPullRequest = withUnistyles(GitPullRequest);
 const ThemedCircleDot = withUnistyles(CircleDot);
 const ThemedAudioLines = withUnistyles(AudioLines);
 const ThemedPaperclip = withUnistyles(Paperclip);
+const ThemedCamera = withUnistyles(Camera);
 const ThemedImageIcon = withUnistyles(ImageIcon);
 const ThemedClipboardPaste = withUnistyles(ClipboardPaste);
 const ThemedFileText = withUnistyles(FileText);
