@@ -64,10 +64,14 @@
         "packages/app/src/agent-stream/native-scroll-gesture",
         "packages/app/src/agent-stream/bottom-anchor-controller",
         "packages/app/src/panels/",
+        "packages/app/src/composer/input/input.tsx",
+        "packages/app/src/screens/settings/general/sending-section.tsx",
+        "packages/app/e2e/browser/desktop-send-shortcut",
+        "packages/app/e2e/support/helpers/local-desktop-host",
         "packages/app/e2e/browser/sidebar-reorder",
         "packages/app/e2e/browser/workspace-navigation"
       ],
-      "contract": "Stable manual order, collapsed projects, mobile gesture arbitration and current-session navigation."
+      "contract": "Stable manual order, collapsed projects, mobile gesture arbitration, current-session navigation and desktop send shortcuts at every window width."
     },
     {
       "id": "distribution",

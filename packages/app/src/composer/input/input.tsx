@@ -81,7 +81,7 @@ import { formatShortcut, type ShortcutKey } from "@/utils/format-shortcut";
 import { getShortcutOs } from "@/utils/shortcut-platform";
 import type { MessageInputKeyboardActionKind } from "@/keyboard/actions";
 import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
-import { isNative, isWeb } from "@/constants/platform";
+import { getIsElectron, isNative, isWeb } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useComposerKeyboardScope } from "@/composer/keyboard-scope";
 import { RenderProfile } from "@/utils/render-profiler";
@@ -1860,7 +1860,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     );
 
     const shouldHandleWebKeyPress = isWeb;
-    const shouldSubmitOnEnter = isWeb && !isCompact;
+    const shouldSubmitOnEnter = isWeb && (getIsElectron() || !isCompact);
 
     const handleDesktopKeyPress = useCallback(
       (event: WebTextInputKeyPressEvent) => {

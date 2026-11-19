@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { SettingsCard, SettingsSection, SettingsSelect } from "@/components/settings";
 import { useAppSettings, type SendShortcut, type SendBehavior } from "@/hooks/use-settings";
 import { useHardwareKeyboardPresent, supportsConfigurableComposerSendKeys } from "@/keyboard";
+import { getIsElectron } from "@/constants/platform";
 import { getShortcutOs } from "@/utils/shortcut-platform";
 
 const SEND_BEHAVIORS: readonly SendBehavior[] = ["interrupt", "steer", "queue"];
@@ -10,7 +11,9 @@ const SEND_BEHAVIORS: readonly SendBehavior[] = ["interrupt", "steer", "queue"];
 export function SendingSection() {
   const { t } = useTranslation();
   const { settings, updateSettings } = useAppSettings();
-  const shortcutsAvailable = useHardwareKeyboardPresent() && supportsConfigurableComposerSendKeys;
+  const hardwareKeyboardPresent = useHardwareKeyboardPresent();
+  const shortcutsAvailable =
+    supportsConfigurableComposerSendKeys && (getIsElectron() || hardwareKeyboardPresent);
   const modifier = getShortcutOs() === "mac" ? "⌘" : "Ctrl";
   const options = useMemo(
     () =>

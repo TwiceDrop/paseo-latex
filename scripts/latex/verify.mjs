@@ -44,6 +44,7 @@ const suites = {
     "src/assistant-selection-copy/content.browser.test.ts",
   ],
   e2e: [
+    "e2e/browser/desktop-send-shortcut.spec.ts",
     "e2e/browser/sidebar-reorder.spec.ts",
     "e2e/browser/document-preview.spec.ts",
     "e2e/browser/mermaid-streaming.spec.ts",
