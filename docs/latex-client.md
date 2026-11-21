@@ -12,7 +12,7 @@ another renderer or replacing an existing client feature with a Host plugin.
 
 The personal source repository is `https://github.com/TwiceDrop/paseo-latex.git`.
 Its default `main` branch includes the personal patches; `paseo-latex` is the
-maintenance branch, based on upstream `v0.16.1`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
+maintenance branch, based on upstream `v0.16.2`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
 build machines also need the native compiler prerequisites required by the target.
 
 ```sh
@@ -462,7 +462,7 @@ opting into API downloads also requires the GitHub CLI.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.16.1
+npm run latex:update -- --ref v0.16.2
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,
