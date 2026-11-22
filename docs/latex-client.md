@@ -89,7 +89,8 @@ To retry or mirror a particular published version, open GitHub **Actions → LaT
 CNB Mirror → Run workflow**. Leave `release_tag` empty for the latest stable
 personal release, or enter a tag such as `latex-v0.15.3-r1`. Existing attachments
 are downloaded and verified before reuse; mismatched files cause a failure and
-are never overwritten. A failed initial upload leaves a resumable draft. The
+are never overwritten. A failed initial upload leaves a resumable draft. The mirror streams each file with curl,
+allows 25 minutes per upload attempt and retries a stalled transfer once. The
 script accepts the personal APK, Windows x64 EXE and `SHA256SUMS.txt`. From
 `latex-v0.15.3-r2` it also requires `latest.yml` and checks its versioned CNB URL,
 installer size and SHA-512 before mirroring it. Older releases retain their

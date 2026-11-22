@@ -309,22 +309,48 @@ async function uploadAsset(releasePath, asset, directory) {
       ttl: 0,
     },
   });
-  const response = await request(
-    httpsURL(upload.upload_url),
-    {
-      method: "PUT",
-      redirect: "error",
-      duplex: "half",
-      headers: {
-        "Content-Length": String(asset.size),
-        "Content-Type": "application/octet-stream",
-      },
-      body: createReadStream(join(directory, asset.name)),
-    },
-    "CNB upload",
+  // Keep the signed URL in stdin and discard the storage response body. Only the
+  // status, byte count and curl exit code are safe to put in the workflow log.
+  const url = httpsURL(upload.upload_url);
+  const transfer = spawnSync(
+    "curl",
+    [
+      "--disable",
+      "--config",
+      "-",
+      "--proto",
+      "=https",
+      "--globoff",
+      "--silent",
+      "--connect-timeout",
+      "30",
+      "--speed-limit",
+      "4096",
+      "--speed-time",
+      "90",
+      "--max-time",
+      "1500",
+      "--retry",
+      "1",
+      "--retry-delay",
+      "3",
+      "--header",
+      "Content-Type: application/octet-stream",
+      "--upload-file",
+      join(directory, asset.name),
+      "--output",
+      "/dev/null",
+      "--write-out",
+      "%{http_code} %{size_upload}",
+    ],
+    { encoding: "utf8", input: `url = ${JSON.stringify(url.href)}\n` },
   );
-  if (!response.ok) throw new Error(`Upload failed: ${asset.name}, HTTP ${response.status}`);
-  await response.arrayBuffer();
+  const [status, bytes] = (transfer.stdout ?? "").trim().split(/\s+/);
+  if (transfer.status !== 0 || !/^2\d\d$/.test(status) || Number(bytes) !== asset.size) {
+    throw new Error(
+      `CNB upload failed for ${asset.name}: curl exit ${transfer.status}, HTTP ${status || "unknown"}, ${Number(bytes) || 0}/${asset.size} bytes sent`,
+    );
+  }
   const confirmation = apiURL(new URL(upload.verify_url, apiBase).href);
   if (
     !confirmation.pathname.startsWith(

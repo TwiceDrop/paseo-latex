@@ -37,7 +37,7 @@ jobs:
       group: latex-cnb-${{ github.event_name == 'push' && 'source' || 'release' }}
       cancel-in-progress: false
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
