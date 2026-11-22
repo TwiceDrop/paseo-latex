@@ -68,6 +68,17 @@ async function verifyShortcut(
   }
 }
 
+async function verifyBothModes(page: Page, host: IsolatedHostDaemon) {
+  try {
+    for (const shortcut of ["Ctrl+Enter", "Enter"] as const) {
+      await verifyShortcut(page, host, shortcut);
+    }
+  } catch (error) {
+    console.error("Packaged renderer at", page.url(), await page.locator("body").ariaSnapshot());
+    throw error;
+  }
+}
+
 async function verify(executablePath: string) {
   const host = await startIsolatedHostDaemon("srv_windows_shortcuts", { rendererOrigin: origin });
   try {
@@ -128,18 +139,7 @@ async function verify(executablePath: string) {
         );
 
         await page.goto(`${origin}/`);
-        try {
-          for (const shortcut of ["Ctrl+Enter", "Enter"] as const) {
-            await verifyShortcut(page, host, shortcut);
-          }
-        } catch (error) {
-          console.error(
-            "Packaged renderer at",
-            page.url(),
-            await page.locator("body").ariaSnapshot(),
-          );
-          throw error;
-        }
+        await verifyBothModes(page, host);
       } finally {
         try {
           await browser?.close();
