@@ -126,3 +126,11 @@
 - 云端验证：[构建](https://github.com/TwiceDrop/paseo-latex/actions/runs/44013633704)通过 613 项客户端单元、73 项浏览器、15 项界面和 3 项跨设备/官方 Host 附件场景；另通过 236 项 Host、38 项桌面更新器和 40 项工作流检查。类型、lint、格式、正式网页导出和补丁重建均通过。
 - [发布任务](https://github.com/TwiceDrop/paseo-latex/actions/runs/44016571115)复核 Android 原签名、包名和 `versionCode=1600001`；Windows 包内更新器通过实际下载及损坏文件拒绝检查。[CNB 镜像](https://github.com/TwiceDrop/paseo-latex/actions/runs/44016653094)复核四个附件上传后与公开下载的完整 SHA-256。实际客户端解析器确认 CNB latest 为 `0.16.0-r1`，Windows 清单为 `0.16.0-latex.1`，地址固定到本次标签。
 - [补丁归档](https://github.com/TwiceDrop/paseo-latex/actions/runs/44013633704/artifacts/14298497772)的补丁 SHA-256 为 `de56454749570fcd0a0832da48fb9960c34365eebd62d50cb9cd00709a7ec267`，重建 tree 为 `4d28f713e1bf8abc2218e3494d5558d151a6d57f`，无未归类文件。当前没有实体 Android/Windows 的手势、覆盖安装或性能测量结论；Android 沿用 low-memory 构建选项。
+
+## LATEX-011：v0.17.2 同步时验证 Windows 斜杠菜单与 Host 切换
+
+2026-11-22 核对时，GitHub 与 CNB 的个人版均为 `0.17.1-r1`。以下为下次同步的待验项。上游在 Chromium 复现了斜杠菜单的时序问题；个人版现有 `desktop-send-shortcut.spec.ts` 在模拟 Windows 的浏览器里覆盖了两档发送设置及其持久化。[上游发布说明](https://github.com/getpaseo/paseo/releases/tag/v0.17.2)
+
+- [ ] Windows x64 桌面客户端使用临时会话。分别设置「Enter 发送」和「Ctrl+Enter 发送」。每档都先输入 `/e` 使 `/exit` 高亮，再改为 `/co`，在菜单刷新前分别按一次 Tab、Enter。四种组合均应保留草稿 `/co`、没有发出消息、会话仍打开。自动化沿用 `client-slash-commands.spec.ts` 的受控事件顺序。[上游 PR #10484](https://github.com/getpaseo/paseo/pull/10484)
+- [ ] 菜单刷新后，主动选择匹配的 `/exit` 应能归档临时会话。关闭菜单后，用普通文本确认两档行为：Enter 发送时 Shift+Enter 换行；Ctrl+Enter 发送时 Enter 换行。
+- [ ] 为**同一个 Host** 保存两条连接。在当前连接持续流式输出时引入短暂心跳延迟，确认会话保持在线、输出连续。再让备用连接持续更快，验证新连接就绪后才切换；若备用连接建立失败，原连接仍可用。复核 `packages/app/src/runtime/host-runtime.test.ts`。[上游 PR #10395](https://github.com/getpaseo/paseo/pull/10395)
