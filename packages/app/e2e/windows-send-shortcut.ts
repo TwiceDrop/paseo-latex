@@ -56,26 +56,20 @@ async function verifyShortcut(
     await composer.fill(message);
     await composer.press(shortcut === "Enter" ? "Enter" : "Control+Enter");
     await expect(page.getByTestId("user-message").filter({ hasText: message })).toBeVisible();
-    await composer.fill("/exit");
-    await expect(page.getByText("/exit", { exact: true }).first()).toBeVisible();
+    await expect(composer).toHaveValue("");
+    await agent.client.waitForFinish(agent.agentId, 30_000);
+    await composer.fill("/qu");
+    await expect(page.getByText("/exit", { exact: true }).first()).toBeVisible({ timeout: 30_000 });
     await composer.press("Enter");
     await expect
       .poll(() => agent.client.fetchAgent({ agentId: agent.agentId }), { timeout: 15000 })
       .toMatchObject({ agent: { archivedAt: expect.any(String) } });
     console.log(`Verified ${shortcut}: stale Tab/Enter, ordinary newline/send, deliberate /exit.`);
-  } finally {
-    await agent.cleanup();
-  }
-}
-
-async function verifyBothModes(page: Page, host: IsolatedHostDaemon) {
-  try {
-    for (const shortcut of ["Ctrl+Enter", "Enter"] as const) {
-      await verifyShortcut(page, host, shortcut);
-    }
   } catch (error) {
     console.error("Packaged renderer at", page.url(), await page.locator("body").ariaSnapshot());
     throw error;
+  } finally {
+    await agent.cleanup();
   }
 }
 
@@ -139,7 +133,9 @@ async function verify(executablePath: string) {
         );
 
         await page.goto(`${origin}/`);
-        await verifyBothModes(page, host);
+        for (const shortcut of ["Ctrl+Enter", "Enter"] as const) {
+          await verifyShortcut(page, host, shortcut);
+        }
       } finally {
         try {
           await browser?.close();
