@@ -992,6 +992,8 @@ async function smokePackagedDesktopApp({
 
 module.exports = {
   smokePackagedDesktopApp,
+  connectToPackagedApp,
+  waitForPackagedAppPage,
 };
 
 if (require.main === module) {

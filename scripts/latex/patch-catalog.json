@@ -68,6 +68,7 @@
         "packages/app/src/screens/settings/general/sending-section.tsx",
         "packages/app/e2e/browser/desktop-send-shortcut",
         "packages/app/e2e/windows-send-shortcut",
+        "packages/desktop/e2e/packaged-app-smoke.js",
         "packages/app/e2e/browser/client-slash-commands",
         "packages/app/e2e/support/helpers/slash-menu",
         "packages/app/e2e/support/helpers/local-desktop-host",

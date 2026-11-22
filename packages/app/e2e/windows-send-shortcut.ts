@@ -1,10 +1,14 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { _electron, expect, type Page } from "@playwright/test";
+import { spawn } from "node:child_process";
+import { expect, type Browser, type Page } from "@playwright/test";
+import { connectToPackagedApp, waitForPackagedAppPage } from "../../desktop/e2e/packaged-app-smoke";
+import { killProcessTree } from "./support/helpers/spawn-node";
 import { buildSeededHost } from "./support/helpers/daemon-registry";
 import {
   startIsolatedHostDaemon,
+  getAvailableHostDaemonPort,
   type IsolatedHostDaemon,
 } from "./support/helpers/isolated-host-daemon";
 import { buildAgentRoute, seedMockAgentWorkspace } from "./support/helpers/mock-agent";
@@ -77,13 +81,28 @@ async function verify(executablePath: string) {
           },
         }),
       );
-      const app = await _electron.launch({
-        executablePath,
-        args: ["--lang=en-US"],
-        env: { ...process.env, PASEO_ELECTRON_USER_DATA_DIR: userData },
+      const cdpPort = await getAvailableHostDaemonPort();
+      const child = spawn(executablePath, [], {
+        stdio: "inherit",
+        env: {
+          ...process.env,
+          PASEO_ELECTRON_USER_DATA_DIR: userData,
+          PASEO_ELECTRON_FLAGS: `--lang=en-US --remote-debugging-address=127.0.0.1 --remote-debugging-port=${cdpPort}`,
+        },
       });
+      let browser: Browser | undefined;
       try {
-        const page = await app.firstWindow({ timeout: 30000 });
+        const deadline = Date.now() + 60_000;
+        browser = await connectToPackagedApp({
+          child,
+          cdpPort,
+          userData,
+          daemonHome: path.join(userData, "daemon"),
+          stdout: [],
+          stderr: [],
+          deadline,
+        });
+        const page: Page = await waitForPackagedAppPage(browser, deadline);
         page.setDefaultTimeout(30000);
         await page.waitForURL(`${origin}/**`);
         expect(await page.evaluate(() => window.paseoDesktop?.platform)).toBe("win32");
@@ -106,7 +125,11 @@ async function verify(executablePath: string) {
           await verifyShortcut(page, host, shortcut);
         }
       } finally {
-        await app.close();
+        try {
+          await browser?.close();
+        } finally {
+          await killProcessTree(child);
+        }
       }
     } finally {
       await rm(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
