@@ -12,7 +12,7 @@ another renderer or replacing an existing client feature with a Host plugin.
 
 The personal source repository is `https://github.com/TwiceDrop/paseo-latex.git`.
 Its default `main` branch includes the personal patches; `paseo-latex` is the
-maintenance branch, based on upstream `v0.17.1`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
+maintenance branch, based on upstream `v0.17.2`. Use Node.js 22.20 or a newer Node 22 release and npm. Linux
 build machines also need the native compiler prerequisites required by the target.
 
 ```sh
@@ -163,8 +163,10 @@ an Android device test of permission and system-installer UI.
 The personal client uses the official host's existing file upload and file editing
 RPCs to share sent attachments. It does not add a daemon RPC or change canonical
 timeline schemas. Both viewing clients need this patch; an official client still
-renders its ordinary text-only history. Sending requires the host's existing
-`workspaceFileEditing` and `canonicalSubmittedPrompts` capabilities.
+renders its ordinary text-only history. Persisting shared attachments requires the host's existing
+`workspaceFileEditing` and `canonicalSubmittedPrompts` capabilities. A message containing only
+legacy GitHub PR or issue references can still send these self-contained references through the
+original RPC on hosts that predate canonical prompts.
 
 Metadata lives under the host OS user's `~/.paseo-latex/attachments-v1/`, scoped by
 the host's advertised server ID and message ID. Uploaded image bytes live in the
@@ -463,7 +465,7 @@ opting into API downloads also requires the GitHub CLI.
 Commit local changes before updating. Select a released tag explicitly:
 
 ```powershell
-npm run latex:update -- --ref v0.17.1
+npm run latex:update -- --ref v0.17.2
 ```
 
 Replace the example tag with the release you want. The command fetches upstream,

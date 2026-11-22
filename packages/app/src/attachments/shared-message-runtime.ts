@@ -61,6 +61,15 @@ export async function shareMessageAttachments(
   if ((input.images?.length ?? 0) !== (input.encodedImages?.length ?? 0)) {
     throw new Error(i18n.t("message.attachments.sharedImagesMissing"));
   }
+  // COMPAT(legacyGithubAttachments): hosts predating canonical prompts accept these
+  // self-contained references in the message RPC. There are no local bytes to upload.
+  if (
+    !input.images?.length &&
+    input.attachments?.every(({ type }) => type === "github_issue" || type === "github_pr")
+  ) {
+    const info = client.getLastServerInfoMessage();
+    if (info && !info.features?.canonicalSubmittedPrompts) return null;
+  }
   try {
     return await getSharedMessageStore(client).save({
       clientMessageId: input.clientMessageId,

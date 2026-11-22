@@ -636,25 +636,34 @@ test("Windows units and integration run independently with complete routed cover
   // Each vitest start costs about half a minute on Windows, so the
   // name-filtered files share one invocation and one combined filter.
   assert.equal(invocations.length, 2);
-  assert.ok(invocations.every((command) => command.startsWith("vitest run --maxWorkers=1 ")));
+  assert.ok(
+    invocations.every((command) =>
+      command.startsWith("vitest run --fileParallelism --maxWorkers=3 "),
+    ),
+  );
   assert.doesNotMatch(invocations[0], / -t /);
   assert.equal(
     invocations[1],
-    'vitest run --maxWorkers=1 src/server/agent/providers/omp/history.e2e.test.ts src/server/daemon-e2e/git-operations.e2e.test.ts src/server/session.create-agent-worktree-autoarchive.e2e.test.ts src/server/agent/providers/opencode-bridge.local.e2e.test.ts src/server/daemon-e2e/relay-transport.e2e.test.ts -t "merges into|creates a worktree and auto-archives both|versioned runtime|oversized attachments|connected hosts|password-protected daemon refuses|replays selected OMP history"',
+    'vitest run --fileParallelism --maxWorkers=3 src/server/agent/providers/omp/history.e2e.test.ts src/server/daemon-e2e/git-operations.e2e.test.ts src/server/session.create-agent-worktree-autoarchive.e2e.test.ts src/server/agent/providers/opencode-bridge.local.e2e.test.ts src/server/daemon-e2e/relay-transport.e2e.test.ts -t "merges into|creates a worktree and auto-archives both|versioned runtime|oversized attachments|connected hosts|password-protected daemon refuses|replays selected OMP history"',
   );
   const serverConfig = readFileSync(new URL("packages/server/vitest.config.ts", repoRoot), "utf8");
-  function workerLimit(platform) {
-    const config = runInNewContext(serverConfig.slice(serverConfig.indexOf("defineConfig(")), {
-      defineConfig: (configuration) => configuration,
-      path: { resolve: resolvePath },
-      __dirname: fileURLToPath(new URL("packages/server/", repoRoot)),
-      process: { platform },
-    });
+  function workerLimit(platform, ci = false) {
+    const config = runInNewContext(
+      serverConfig.replace(/^import .*$/gm, "").replace("export default ", ""),
+      {
+        defineConfig: (configuration) => configuration,
+        path: { resolve: resolvePath },
+        __dirname: fileURLToPath(new URL("packages/server/", repoRoot)),
+        process: { platform, env: { CI: ci ? "1" : undefined } },
+      },
+    );
     return config.test.maxWorkers;
   }
   assert.equal(workerLimit("win32"), 1);
   assert.equal(workerLimit("linux"), undefined);
   assert.equal(workerLimit("darwin"), undefined);
+  assert.equal(workerLimit("win32", true), 1);
+  assert.equal(workerLimit("linux", true), "100%");
 
   function condition(job) {
     return /    if: \$\{\{ (.+) \}\}/.exec(job)[1];

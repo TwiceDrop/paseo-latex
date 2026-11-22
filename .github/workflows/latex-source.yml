@@ -243,6 +243,13 @@ jobs:
           PASEO_LATEX_BUILD_REVISION: ${{ inputs.revision }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run windows:latex -- --revision $env:PASEO_LATEX_BUILD_REVISION
+      - name: Verify send shortcuts in packaged Windows desktop
+        working-directory: packages/app
+        run: |
+          $exe = @(Get-ChildItem ../../artifacts/windows-latex-*/win-unpacked/PaseoLaTeX.exe)
+          if ($exe.Count -ne 1) { throw "Expected one packaged desktop executable" }
+          $executablePath = $exe[0].FullName
+          node --import tsx e2e/windows-send-shortcut.ts $executablePath
       - uses: actions/upload-artifact@v4
         with:
           name: paseo-latex-windows-${{ github.sha }}

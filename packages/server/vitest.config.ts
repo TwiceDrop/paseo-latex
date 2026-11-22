@@ -1,6 +1,8 @@
 import path from "node:path";
 import { defineConfig } from "vitest/config";
 
+const ciWorkerLimit = process.env.CI ? "100%" : undefined;
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -21,7 +23,7 @@ export default defineConfig({
     fileParallelism: false,
     // Even two concurrent Git-heavy suites can exhaust Windows test deadlines.
     // Run files serially so their subprocesses do not compete across suites.
-    maxWorkers: process.platform === "win32" ? 1 : undefined,
+    maxWorkers: process.platform === "win32" ? 1 : ciWorkerLimit,
     exclude: ["**/node_modules/**", "**/dist/**", "**/.claude/**", "**/.dev/**"],
   },
 });

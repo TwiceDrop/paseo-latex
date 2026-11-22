@@ -6,6 +6,7 @@ import {
   type ChildProcess,
   type SpawnOptions,
 } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { tmpdir } from "node:os";
@@ -25,6 +26,7 @@ export interface IsolatedHostDaemon {
 }
 
 export interface IsolatedHostDaemonOptions {
+  rendererOrigin?: string;
   /** Written to the daemon's config.json; `mutableRelay` adds `daemon.relay` to it. */
   config?: { daemon?: Record<string, unknown>; [key: string]: unknown };
   environment?: NodeJS.ProcessEnv;
@@ -144,7 +146,9 @@ export async function startIsolatedHostDaemon(
   let port = await getAvailableHostDaemonPort();
 
   const metroPort = process.env.E2E_METRO_PORT;
-  if (!metroPort) throw new Error("E2E_METRO_PORT is required to start an isolated host daemon");
+  const rendererOrigin =
+    options.rendererOrigin ?? (metroPort ? `http://localhost:${metroPort}` : null);
+  if (!rendererOrigin) throw new Error("Specify the test renderer origin or set E2E_METRO_PORT");
 
   const paseoHome =
     options.paseoHome ?? (await mkdtemp(path.join(tmpdir(), "paseo-e2e-secondary-host-")));
@@ -221,7 +225,7 @@ export async function startIsolatedHostDaemon(
         PASEO_HOME: paseoHome,
         PASEO_SERVER_ID: serverId,
         PASEO_LISTEN: `127.0.0.1:${port}`,
-        PASEO_CORS_ORIGINS: `http://localhost:${metroPort}`,
+        PASEO_CORS_ORIGINS: rendererOrigin,
         PASEO_RELAY_ENABLED: options.mutableRelay ? undefined : "0",
         PASEO_NODE_ENV: "development",
         NODE_ENV: "development",
@@ -229,7 +233,11 @@ export async function startIsolatedHostDaemon(
       stdio: ["ignore", "ignore", "pipe"],
       detached: false,
     };
-    const spawned = publishedPackageRoot
+    const builtSupervisor = path.join(serverDir, "dist/scripts/supervisor-entrypoint.js");
+    const useBuiltSupervisor = Boolean(
+      publishedPackageRoot || (process.env.CI && existsSync(builtSupervisor)),
+    );
+    const spawned = useBuiltSupervisor
       ? spawn(process.execPath, ["dist/scripts/supervisor-entrypoint.js"], spawnOptions)
       : spawnTsx("scripts/supervisor-entrypoint.ts", ["--dev"], spawnOptions);
 

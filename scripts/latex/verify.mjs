@@ -21,6 +21,7 @@ const suites = {
     "src/attachments/service.test.ts",
     "src/data/push-router.test.ts",
     "src/agent-stream/bottom-anchor-controller.test.ts",
+    "src/runtime/host-runtime.test.ts",
     "src/agent-stream/history-start-pagination.test.ts",
     "src/agent-stream/initial-draw-distance.test.ts",
     "src/agent-stream/native-scroll-animation.test.ts",
@@ -46,6 +47,7 @@ const suites = {
   ],
   e2e: [
     "e2e/browser/desktop-send-shortcut.spec.ts",
+    "e2e/browser/client-slash-commands.spec.ts",
     "e2e/browser/sidebar-reorder.spec.ts",
     "e2e/browser/document-preview.spec.ts",
     "e2e/browser/mermaid-streaming.spec.ts",

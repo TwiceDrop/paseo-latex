@@ -1,3 +1,4 @@
+import { typeBeforeMenuFilters } from "../support/helpers/slash-menu";
 import { expect, test, type Page } from "../support/fixtures";
 import { composerLocator, expectComposerVisible, submitMessage } from "../support/helpers/composer";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
@@ -57,6 +58,16 @@ async function selectClientSlashCommand(page: Page, query: string, label: string
   await input.fill(query);
   await expect(page.getByText(label, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   await input.press("Enter");
+}
+
+async function showExitSuggestion(page: Page, query: string): Promise<void> {
+  await composerLocator(page).fill(query);
+  await expect(page.getByText("/exit", { exact: true }).first()).toBeVisible();
+}
+
+async function expectOpenAgentWithInput(page: Page, agentId: string, text: string): Promise<void> {
+  await expect(composerLocator(page)).toHaveValue(text);
+  await expectWorkspaceTabVisible(page, agentId);
 }
 
 async function expectAgentArchivedInSessions(page: Page, title: string): Promise<void> {
@@ -130,6 +141,16 @@ test.describe("Client slash commands", () => {
       },
     );
   });
+
+  for (const key of ["Tab", "Enter"] as const) {
+    test(`${key} ignores an exit suggestion for an earlier query`, async ({ page }) => {
+      await withOpenReadyMockAgent(page, { title: "Stale slash command" }, async ({ agentId }) => {
+        await showExitSuggestion(page, "/e");
+        await typeBeforeMenuFilters(composerLocator(page), { text: "/co", key });
+        await expectOpenAgentWithInput(page, agentId, "/co");
+      });
+    });
+  }
 
   test("slash clear replaces the active agent with a matching draft", async ({ page }) => {
     await withOpenReadyMockAgent(

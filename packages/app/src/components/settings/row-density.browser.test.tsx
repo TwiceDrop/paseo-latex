@@ -8,6 +8,7 @@ import {
   SettingsCollapsibleRow,
   SettingsDetailRow,
   SettingsRow,
+  SettingsSwitch,
 } from "@/components/settings";
 import { I18nextProvider } from "react-i18next";
 import { i18n } from "@/i18n/i18next";
@@ -26,6 +27,7 @@ afterEach(() => {
 });
 
 function openNothing() {}
+function toggleNothing() {}
 
 function mountRows() {
   container = document.createElement("div");
@@ -39,6 +41,13 @@ function mountRows() {
             Download
           </Button>
         </SettingsRow>
+        <SettingsRow label="Text only" testID="text-row" />
+        <SettingsSwitch
+          label="Toggles"
+          value={false}
+          onValueChange={toggleNothing}
+          testID="switch-row"
+        />
         <SettingsDetailRow label="Opens a page" onPress={openNothing} testID="detail-row" />
         <SettingsCollapsibleRow label="Group" defaultExpanded testID="group">
           <SettingsRow label="Nested with a button" testID="nested-with-button">
@@ -80,11 +89,13 @@ describe("settings row density", () => {
     expect(heightOf("group-toggle")).toBeGreaterThan(heightOf("nested-without-button"));
   });
 
-  it("keeps a row that opens something as tall as a row holding a control", () => {
+  it("lines up text, switch, and opening rows below a row holding a button", () => {
     mountRows();
 
-    expect(heightOf("detail-row")).toBe(heightOf("card-row"));
-    expect(heightOf("group-toggle")).toBe(heightOf("card-row"));
+    expect(heightOf("switch-row")).toBe(heightOf("text-row"));
+    expect(heightOf("detail-row")).toBe(heightOf("text-row"));
+    expect(heightOf("group-toggle")).toBe(heightOf("text-row"));
+    expect(heightOf("card-row")).toBeGreaterThan(heightOf("text-row"));
   });
 
   it("sizes nested text and controls one step below card rows", () => {

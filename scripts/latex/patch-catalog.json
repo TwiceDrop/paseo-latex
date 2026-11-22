@@ -1,7 +1,7 @@
 {
   "upstream": {
-    "tag": "v0.17.1",
-    "commit": "043f0995d4d7e91ab12f3eecef1afce055a81972"
+    "tag": "v0.17.2",
+    "commit": "b2ca56ee73cb039d65ef23bc3b4bf17f7a650fa0"
   },
   "features": [
     {
@@ -67,6 +67,9 @@
         "packages/app/src/composer/input/input.tsx",
         "packages/app/src/screens/settings/general/sending-section.tsx",
         "packages/app/e2e/browser/desktop-send-shortcut",
+        "packages/app/e2e/windows-send-shortcut",
+        "packages/app/e2e/browser/client-slash-commands",
+        "packages/app/e2e/support/helpers/slash-menu",
         "packages/app/e2e/support/helpers/local-desktop-host",
         "packages/app/e2e/browser/sidebar-reorder",
         "packages/app/e2e/browser/workspace-navigation"
@@ -101,6 +104,8 @@
         "packages/app/vitest",
         "packages/app/test-stubs/",
         "packages/app/e2e/support/metro",
+        "packages/app/e2e/support/helpers/isolated-host-daemon",
+        "packages/app/src/runtime/host-runtime.test.ts",
         "packages/app/src/polyfills/",
         "packages/app/src/i18n/",
         "packages/app/src/components/settings/",
