@@ -11,7 +11,9 @@ import {
   getAvailableHostDaemonPort,
   type IsolatedHostDaemon,
 } from "./support/helpers/isolated-host-daemon";
-import { buildAgentRoute, seedMockAgentWorkspace } from "./support/helpers/mock-agent";
+import { openSettings } from "./support/helpers/app";
+import { openSessions } from "./support/helpers/archive-tab";
+import { seedMockAgentWorkspace } from "./support/helpers/mock-agent";
 import { typeBeforeMenuFilters } from "./support/helpers/slash-menu";
 
 const origin = "paseo://app";
@@ -27,13 +29,14 @@ async function verifyShortcut(
     title: `Send with ${shortcut}`,
   });
   try {
-    await page.goto(`${origin}/settings/general`);
+    await openSettings(page);
     const selector = page.getByRole("button", { name: /^Send shortcut:/ });
     await selector.click();
     await page.getByRole("menuitem", { name: shortcut, exact: true }).click();
     await expect(selector).toHaveAccessibleName(`Send shortcut: ${shortcut}`);
-    const route = buildAgentRoute(agent.workspaceId, agent.agentId, host.serverId);
-    await page.goto(new URL(route, origin).href);
+    await page.goto(`${origin}/`);
+    await openSessions(page);
+    await page.getByTestId(`agent-row-${host.serverId}-${agent.agentId}`).click();
     const composer = page.getByRole("textbox", { name: "Message agent..." });
     await expect(composer).toBeEditable({ timeout: 30_000 });
     for (const key of ["Tab", "Enter"] as const) {
@@ -106,9 +109,12 @@ async function verify(executablePath: string) {
         page.setDefaultTimeout(30000);
         await page.waitForURL(`${origin}/**`);
         expect(await page.evaluate(() => window.paseoDesktop?.platform)).toBe("win32");
-        await page.evaluate(
+        await page.addInitScript(
           (record) => {
             localStorage.setItem("@paseo:daemon-registry", JSON.stringify([record]));
+            if (!localStorage.getItem("@paseo:app-settings")) {
+              localStorage.setItem("@paseo:app-settings", JSON.stringify({ language: "en" }));
+            }
             localStorage.setItem(
               "@paseo:onboarding",
               JSON.stringify({ completedAt: new Date().toISOString() }),
@@ -121,8 +127,18 @@ async function verify(executablePath: string) {
           }),
         );
 
-        for (const shortcut of ["Ctrl+Enter", "Enter"] as const) {
-          await verifyShortcut(page, host, shortcut);
+        await page.goto(`${origin}/`);
+        try {
+          for (const shortcut of ["Ctrl+Enter", "Enter"] as const) {
+            await verifyShortcut(page, host, shortcut);
+          }
+        } catch (error) {
+          console.error(
+            "Packaged renderer at",
+            page.url(),
+            await page.locator("body").ariaSnapshot(),
+          );
+          throw error;
         }
       } finally {
         try {
