@@ -104,9 +104,12 @@ it("copies rendered MathML back to TeX without losing the source", async () => {
   const selection = window.getSelection()!;
   selection.removeAllRanges();
   selection.addRange(range);
-  const copied = createAssistantSelectionClipboardContent(selection)!.plainText;
-  expect(copied).toContain("$x^2$");
-  expect(copied).toContain("$$\\int_0^1 x\\,dx$$");
+  const copied = createAssistantSelectionClipboardContent(selection)!;
+  const richText = new DOMParser().parseFromString(copied.html, "text/html").body.textContent;
+  for (const text of [copied.plainText, richText]) {
+    expect(text).toContain("$x^2$");
+    expect(text).toContain("$$\\int_0^1 x\\,dx$$");
+  }
 });
 
 it("renders TeX examples inside HTML details as literal code", async () => {

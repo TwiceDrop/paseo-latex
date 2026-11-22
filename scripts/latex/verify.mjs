@@ -22,6 +22,7 @@ const suites = {
     "src/data/push-router.test.ts",
     "src/agent-stream/bottom-anchor-controller.test.ts",
     "src/agent-stream/history-start-pagination.test.ts",
+    "src/agent-stream/initial-draw-distance.test.ts",
     "src/agent-stream/native-scroll-animation.test.ts",
     "src/agent-stream/native-disclosure-hold.test.ts",
     "src/agent-stream/render-strategy.test.ts",

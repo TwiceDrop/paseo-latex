@@ -3,7 +3,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 import { Button } from "@/components/ui/button";
-import { SettingsCard, SettingsCollapsibleRow, SettingsRow } from "@/components/settings";
+import {
+  SettingsCard,
+  SettingsCollapsibleRow,
+  SettingsDetailRow,
+  SettingsRow,
+} from "@/components/settings";
 import { I18nextProvider } from "react-i18next";
 import { i18n } from "@/i18n/i18next";
 import { LatexAppUpdateRow } from "@/updates/latex-update-row";
@@ -20,6 +25,8 @@ afterEach(() => {
   container = null;
 });
 
+function openNothing() {}
+
 function mountRows() {
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -32,6 +39,7 @@ function mountRows() {
             Download
           </Button>
         </SettingsRow>
+        <SettingsDetailRow label="Opens a page" onPress={openNothing} testID="detail-row" />
         <SettingsCollapsibleRow label="Group" defaultExpanded testID="group">
           <SettingsRow label="Nested with a button" testID="nested-with-button">
             <Button variant="outline" testID="nested-button">
@@ -70,6 +78,13 @@ describe("settings row density", () => {
     expect(heightOf("nested-with-button")).toBe(heightOf("nested-without-button"));
     expect(heightOf("nested-with-button")).toBeLessThan(heightOf("card-row"));
     expect(heightOf("group-toggle")).toBeGreaterThan(heightOf("nested-without-button"));
+  });
+
+  it("keeps a row that opens something as tall as a row holding a control", () => {
+    mountRows();
+
+    expect(heightOf("detail-row")).toBe(heightOf("card-row"));
+    expect(heightOf("group-toggle")).toBe(heightOf("card-row"));
   });
 
   it("sizes nested text and controls one step below card rows", () => {
