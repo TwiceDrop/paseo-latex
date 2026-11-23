@@ -19,6 +19,10 @@ const customWebPlatform = (process.env.PASEO_WEB_PLATFORM ?? "")
 const config = getDefaultConfig(projectRoot);
 if (process.env.PASEO_LOW_MEMORY_BUILD === "1") config.maxWorkers = 1;
 config.cacheVersion = isWatchdogBuild ? "watchdog" : "standard";
+// Expo inlines the app manifest on web, including the LaTeX flag and revision used by Electron.
+if (process.env.APP_VARIANT === "latex") {
+  config.cacheVersion += `-latex-r${process.env.PASEO_LATEX_REVISION ?? "1"}`;
+}
 const defaultResolveRequest = config.resolver.resolveRequest ?? resolve;
 
 // Keep app exports deterministic across dev machines and CI. Metro's Watchman

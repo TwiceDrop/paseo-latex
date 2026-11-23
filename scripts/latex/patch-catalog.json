@@ -16,6 +16,18 @@
       "contract": "Native RaTeX / web KaTeX, streaming TeX boundaries and source copying; no Host plugin required."
     },
     {
+      "id": "device-plugins",
+      "paths": [
+        "packages/app/src/plugins/device-",
+        "packages/app/src/plugins/catalog-sync",
+        "packages/app/src/plugins/gallery/device-block-section",
+        "packages/app/src/plugins/gallery/installed-tab",
+        "packages/app/src/plugins/gallery/plugin-page",
+        "packages/app/e2e/browser/plugin-management"
+      ],
+      "contract": "Persist per-Host plugin blocks on this LaTeX client, apply before bundle evaluation, and keep Host configuration independent."
+    },
+    {
       "id": "documents",
       "paths": [
         "packages/app/src/file-pane/",

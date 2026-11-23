@@ -5,6 +5,7 @@ import { QueryObserver } from "@tanstack/react-query";
 import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
 import { settingsRpc } from "@getpaseo/plugin";
+import { createDeviceCatalog } from "./device-catalog";
 import { syncPluginCatalog } from "./catalog-sync-model";
 import { createPluginHosts } from "./hosts";
 import { PluginRegistry } from "./registry";
@@ -200,6 +201,45 @@ async function connected() {
   await expect.poll(() => h.registry.getSnapshot().length).toBe(1);
   return { ...h, stop };
 }
+
+it("applies a device block across catalog changes while another client uses the same Host plugin", async () => {
+  const latex = harness();
+  const other = harness();
+  const host = latex.client;
+  const device = createDeviceCatalog("host", latex.registry);
+  const otherPlugin = { ...catalog("unrelated")[0]!, id: "other-plugin" };
+  host.catalog.push(otherPlugin);
+  device.setBlocked(["reports"]);
+  const stop = latex.sync({ registry: device.registry });
+  other.sync({ client: host });
+  await expect.poll(() => latex.registry.getCatalogStatus("host")).toBe("ready");
+  await expect.poll(() => other.registry.getSnapshot().length).toBe(2);
+  expect(latex.evaluations()).toBe(1);
+  const preserved = latex.installed();
+  expect(preserved.id).toBe("other-plugin");
+  const otherReports = () => other.registry.getSnapshot().find((entry) => entry.id === "reports");
+  expect(otherReports()?.timelineTransformers).toHaveLength(1);
+
+  host.catalog = [...catalog("updated"), otherPlugin];
+  host.snapshot();
+  await expect.poll(() => otherReports()?.clientBundle).toBe(host.catalog[0]?.clientBundle);
+  await expect.poll(() => latex.registry.getCatalogStatus("host")).toBe("ready");
+  expect(latex.evaluations()).toBe(1);
+  stop();
+  device.setBlocked([]);
+  const restored = latex.registry.getSnapshot();
+  const reports = restored.find((entry) => entry.id === "reports");
+  expect(reports?.clientBundle).toBe(host.catalog[0]?.clientBundle);
+  expect(restored.find((entry) => entry.id === preserved.id)?.lifetime).toBe(preserved.lifetime);
+  device.setBlocked(["reports"]);
+  expect(latex.registry.getSnapshot().map((entry) => entry.id)).toEqual([preserved.id]);
+  expect(reports?.lifetime.signal.aborted).toBe(true);
+  expect(otherReports()?.lifetime.signal.aborted).toBe(false);
+
+  device.registry.removeHost("host");
+  device.setBlocked([]);
+  expect(latex.registry.getSnapshot()).toEqual([]);
+});
 
 it("keeps a restored plugin screen loading until its catalog arrives", async () => {
   const h = harness();

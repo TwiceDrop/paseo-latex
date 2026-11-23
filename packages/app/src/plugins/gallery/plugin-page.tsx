@@ -57,6 +57,8 @@ import {
   usePluginListing,
   usePluginUpdates,
 } from "./queries";
+import { isLatexBuild } from "@/updates/latex-distribution";
+import { DeviceBlockSection } from "./device-block-section";
 import { pluginErrorText } from "./error-text";
 
 /** Which plugin the page is for: one installed on the host, or one listed in the directory. */
@@ -521,6 +523,9 @@ function PluginPageBody({
         <View style={styles.block}>
           <Alert size="sm" variant="error" title={model.updateError} />
         </View>
+      ) : null}
+      {isLatexBuild && plugin ? (
+        <DeviceBlockSection serverId={serverId} pluginId={plugin.id} />
       ) : null}
       {listing ? <MediaStrip urls={listingImages(listing)} /> : null}
       {plugin && model.screenId ? (

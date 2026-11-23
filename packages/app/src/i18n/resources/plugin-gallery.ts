@@ -1,6 +1,11 @@
 /** Settings → Plugins: the installed list, the directory and a plugin's page. */
 export const pluginGallery = {
   en: {
+    device: {
+      block: "Block on this device",
+      hint: "Applies to this plugin’s client features when connected to this Host. The Host and other devices keep their settings.",
+      blocked: "Blocked on this device",
+    },
     tabs: { installed: "Installed", installedCount: "Installed · {{count}}", browse: "Browse" },
     search: { installed: "Search installed", browse: "Search plugins", clear: "Clear search" },
     filters: {
@@ -60,6 +65,11 @@ export const pluginGallery = {
     missing: "This plugin is not installed or listed",
   },
   ar: {
+    device: {
+      block: "حظر على هذا الجهاز",
+      hint: "ينطبق على ميزات الإضافة في التطبيق عند الاتصال بهذا المضيف. يحتفظ المضيف والأجهزة الأخرى بإعداداتها.",
+      blocked: "محظورة على هذا الجهاز",
+    },
     tabs: { installed: "المثبّتة", installedCount: "المثبّتة · {{count}}", browse: "تصفّح" },
     search: { installed: "ابحث في المثبّتة", browse: "ابحث عن إضافات", clear: "مسح البحث" },
     filters: {
@@ -119,6 +129,11 @@ export const pluginGallery = {
     missing: "هذه الإضافة غير مثبّتة وغير مدرجة",
   },
   es: {
+    device: {
+      block: "Bloquear en este dispositivo",
+      hint: "Se aplica a las funciones del complemento en la aplicación al conectarse a este host. El host y los demás dispositivos conservan sus ajustes.",
+      blocked: "Bloqueado en este dispositivo",
+    },
     tabs: { installed: "Instalados", installedCount: "Instalados · {{count}}", browse: "Explorar" },
     search: { installed: "Buscar instalados", browse: "Buscar plugins", clear: "Borrar búsqueda" },
     filters: {
@@ -178,6 +193,11 @@ export const pluginGallery = {
     missing: "Este plugin no está instalado ni publicado",
   },
   fr: {
+    device: {
+      block: "Bloquer sur cet appareil",
+      hint: "Ce réglage concerne les fonctions du plugin dans l’application connectée à cet hôte. L’hôte et les autres appareils conservent leurs réglages.",
+      blocked: "Bloqué sur cet appareil",
+    },
     tabs: { installed: "Installés", installedCount: "Installés · {{count}}", browse: "Parcourir" },
     search: {
       installed: "Rechercher dans les installés",
@@ -241,6 +261,11 @@ export const pluginGallery = {
     missing: "Ce plugin n’est ni installé ni publié",
   },
   ja: {
+    device: {
+      block: "この端末でブロック",
+      hint: "このホストへの接続時に、このアプリ内で動作するプラグイン機能をブロックします。ホストや他の端末の設定は保持されます。",
+      blocked: "この端末でブロック中",
+    },
     tabs: {
       installed: "インストール済み",
       installedCount: "インストール済み · {{count}}",
@@ -313,6 +338,11 @@ export const pluginGallery = {
     missing: "このプラグインはインストールも公開もされていません",
   },
   ko: {
+    device: {
+      block: "이 기기에서 차단",
+      hint: "이 호스트에 연결할 때 앱에서 실행되는 플러그인 기능을 차단합니다. 호스트와 다른 기기의 설정은 유지됩니다.",
+      blocked: "이 기기에서 차단됨",
+    },
     tabs: { installed: "설치됨", installedCount: "설치됨 · {{count}}", browse: "찾아보기" },
     search: { installed: "설치된 항목 검색", browse: "플러그인 검색", clear: "검색 지우기" },
     filters: {
@@ -372,6 +402,11 @@ export const pluginGallery = {
     missing: "이 플러그인은 설치되지 않았고 등록되어 있지도 않습니다",
   },
   "pt-BR": {
+    device: {
+      block: "Bloquear neste dispositivo",
+      hint: "Aplica-se aos recursos do plugin no aplicativo ao se conectar a este host. O host e os outros dispositivos mantêm suas configurações.",
+      blocked: "Bloqueado neste dispositivo",
+    },
     tabs: { installed: "Instalados", installedCount: "Instalados · {{count}}", browse: "Explorar" },
     search: { installed: "Buscar instalados", browse: "Buscar plugins", clear: "Limpar busca" },
     filters: {
@@ -431,6 +466,11 @@ export const pluginGallery = {
     missing: "Este plugin não está instalado nem publicado",
   },
   ru: {
+    device: {
+      block: "Блокировать на этом устройстве",
+      hint: "Действует на функции плагина в приложении при подключении к этому хосту. Настройки хоста и других устройств сохраняются.",
+      blocked: "Заблокирован на этом устройстве",
+    },
     tabs: {
       installed: "Установленные",
       installedCount: "Установленные · {{count}}",
@@ -498,6 +538,11 @@ export const pluginGallery = {
     missing: "Этот плагин не установлен и не опубликован",
   },
   "zh-CN": {
+    device: {
+      block: "仅在本机屏蔽",
+      hint: "连接此 Host 时，LaTeX 版会跳过这个插件的客户端功能。Host 和其他设备继续使用各自的设置。",
+      blocked: "已在本机屏蔽",
+    },
     tabs: { installed: "已安装", installedCount: "已安装 · {{count}}", browse: "浏览" },
     search: { installed: "搜索已安装", browse: "搜索插件", clear: "清除搜索" },
     filters: {

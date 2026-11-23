@@ -13,6 +13,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/contexts/toast-api-context";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
+import { isLatexBuild } from "@/updates/latex-distribution";
+import { useDevicePluginBlocks } from "../device-blocks";
 import { usePluginEvaluationError } from "@/plugins/registry";
 import { pluginDisplayName } from "@/plugins/plugin-list";
 import { settingsStyles } from "@/styles/settings";
@@ -117,6 +119,14 @@ function UpdateRow({
   );
 }
 
+function DeviceBlockBadge({ serverId, pluginId }: { serverId: string; pluginId: string }) {
+  const { t } = useTranslation();
+  const { data } = useDevicePluginBlocks(serverId);
+  return data?.includes(pluginId) ? (
+    <StatusBadge label={t("settings.plugins.gallery.device.blocked")} variant="muted" size="xs" />
+  ) : null;
+}
+
 function InstalledRow({
   serverId,
   plugin,
@@ -139,13 +149,11 @@ function InstalledRow({
     [plugin.id, serverId],
   );
   const toggle = useCallback((enabled: boolean) => onToggle(plugin, enabled), [onToggle, plugin]);
-  const badge = useMemo(
-    () =>
-      failed ? (
-        <StatusBadge label={t("settings.plugins.status.failed")} variant="error" size="xs" />
-      ) : null,
-    [failed, t],
-  );
+  const badge = useMemo(() => {
+    if (failed)
+      return <StatusBadge label={t("settings.plugins.status.failed")} variant="error" size="xs" />;
+    return isLatexBuild ? <DeviceBlockBadge serverId={serverId} pluginId={plugin.id} /> : null;
+  }, [failed, plugin.id, serverId, t]);
   return (
     <PluginRow
       name={name}

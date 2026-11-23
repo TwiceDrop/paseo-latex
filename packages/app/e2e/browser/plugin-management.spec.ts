@@ -401,6 +401,57 @@ async function installFailedPlugin(
   await client.reloadPlugin("failed-preview-plugin");
 }
 
+test("blocks a plugin on this LaTeX device across reloads and restores it without changing the Host", async ({
+  page,
+  pluginEnvironment: { client, directory },
+}) => {
+  test.skip(process.env.APP_VARIANT !== "latex", "This preference belongs to the LaTeX client.");
+  const id = "device-block-example";
+  const source = await createDirectoryPlugin(
+    directory,
+    id,
+    "Tests device preferences",
+    "Device example",
+  );
+  await writeFile(
+    path.join(source, "index.client.tsx"),
+    `export default function contribute() {
+    const storage = globalThis.sessionStorage;
+    storage.setItem("device-example-starts", String(Number(storage.getItem("device-example-starts")) + 1));
+    return () => storage.setItem("device-example-stopped", "yes");
+  }`,
+  );
+  await client.patchDaemonConfig({ pluginsEnabled: true });
+  await client.installPluginSource({ source });
+  await gotoAppShell(page);
+  await openPluginPageFromSettings(page, id);
+  const starts = () => page.evaluate(() => sessionStorage.getItem("device-example-starts"));
+  await expect.poll(starts).toBe("1");
+  const block = page.getByRole("switch", { name: "Block on this device", exact: true });
+  await block.click();
+  await expect(block).toBeChecked();
+  await expect
+    .poll(() => page.evaluate(() => sessionStorage.getItem("device-example-stopped")))
+    .toBe("yes");
+  await backToPlugins(page, id);
+  await expect(pluginRow(page, id).getByText("Blocked on this device")).toBeVisible();
+  await expectPluginOn(page, id);
+
+  const hostPlugin = (await client.getDaemonConfig()).config.plugins?.[id];
+  expect(hostPlugin).toBeDefined();
+  expect(hostPlugin?.enabled).not.toBe(false);
+
+  const catalog = observePluginCatalog(page);
+  await page.reload();
+  await catalog.waitForInitialFetch();
+  await openPluginPage(page, id);
+  await expect(block).toBeChecked();
+  expect(await starts()).toBe("1");
+  await block.click();
+  await expect(block).not.toBeChecked();
+  await expect.poll(starts).toBe("2");
+});
+
 test("installs, reloads, recovers, disables, and removes a trusted local plugin", async ({
   page,
   pluginEnvironment,
